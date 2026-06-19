@@ -1,3 +1,4 @@
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Dict, List, Set, Callable, Union
@@ -260,6 +261,31 @@ class SyncFieldDAG:
             p = self.compute_priority(t_id)
             print(f"{t_id:<5} | {task['task_name']:<38} | {task['state']:<12} | {p.score} (Blocker hr: {p.hours_blocked})")
         print("-" * 80)
+
+    def sync_to_supabase(self, events: List[dict], sb_client) -> None:
+        for event in events:
+            task_id = event["task_id"]
+            self.sync_task_to_supabase(task_id, event, sb_client)
+            self.sync_task_event_to_supabase(event, sb_client)
+            time.sleep(0.05)
+
+    def sync_task_to_supabase(self, task_id: str, event: dict, sb_client) -> None:
+        task = self.tasks[task_id]
+        sb_client.table("tasks").update({
+            "state": event["new_state"],
+            "failure_category": task.get("failure_category"),
+            "attempt_count": task.get("attempt_count", 0),
+            "updated_at": "now()",
+        }).eq("id", task_id).execute()
+
+    def sync_task_event_to_supabase(self, event: dict, sb_client) -> None:
+        sb_client.table("task_events").insert({
+            "task_id": event["task_id"],
+            "old_state": event["old_state"],
+            "new_state": event["new_state"],
+            "reason": event["reason"],
+            "triggered_by": "cascade" if event["reason"] != "Manual operator update" else "manual",
+        }).execute()
 
 
 class FieldOpsDomainRules:

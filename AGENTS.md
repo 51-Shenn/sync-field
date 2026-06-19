@@ -37,6 +37,7 @@ npm start        # serve production build
 ## Environment
 
 Required vars: `DATABASE_URL`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `BETTER_AUTH_URL`
+Required (Supabase): `SUPABASE_URL`, `SUPABASE_SERVICE_KEY` (Python), `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (frontend)
 
 **`.env` contains live credentials** (Telegram bot token, Google OAuth secrets) — never log or commit them.
 
