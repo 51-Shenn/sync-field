@@ -4,7 +4,7 @@ from pathlib import Path
 from telethon import TelegramClient, events
 from telethon.utils import get_display_name
 
-DOWNLOAD_DIR = Path("downloads")
+DOWNLOAD_DIR = Path(__file__).resolve().parent.parent / "downloads"
 
 
 def format_text(event) -> str:
