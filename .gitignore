@@ -51,3 +51,6 @@ venv/
 *.session
 *.session-journal
 downloads/
+
+# repomix
+repomix-output.*
