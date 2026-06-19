@@ -40,11 +40,14 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+/src/generated/prisma
+
 # python / telethon
 __pycache__/
+.venv/
+venv/
 *.pyc
+*.pyo
 *.session
 *.session-journal
 downloads/
-
-/src/generated/prisma

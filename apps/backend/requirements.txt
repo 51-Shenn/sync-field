@@ -7,3 +7,5 @@ python-pptx>=1.0,<2
 google-genai>=2,<3
 Pillow>=11,<12
 comtypes>=1,<2
+supabase>=2.0,<3
+ortools>=9.15,<10
