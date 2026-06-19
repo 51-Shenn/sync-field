@@ -3,7 +3,7 @@
 -- ============================================
 
 -- Sites (buildings/locations)
-create table sites (
+create table if not exists sites (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   address text,
@@ -15,7 +15,7 @@ create table sites (
 );
 
 -- Projects (a site can have multiple projects, typically 1:1)
-create table projects (
+create table if not exists projects (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   site_id uuid references sites(id),
@@ -24,7 +24,7 @@ create table projects (
 );
 
 -- Technicians (field staff)
-create table technicians (
+create table if not exists technicians (
   id uuid primary key default gen_random_uuid(),
   name text not null,
   phone text,
@@ -41,7 +41,7 @@ create table technicians (
 );
 
 -- Tasks = DAG nodes. IDs are text matching Python ("T01", "T02").
-create table tasks (
+create table if not exists tasks (
   id text primary key,
   project_id uuid references projects(id) on delete cascade,
   task_name text not null,
@@ -60,7 +60,7 @@ create table tasks (
 );
 
 -- Messages (Tier 1/2/3 resolution audit trail)
-create table messages (
+create table if not exists messages (
   id uuid primary key default gen_random_uuid(),
   technician_id uuid references technicians(id),
   task_id text references tasks(id),
@@ -73,7 +73,7 @@ create table messages (
 );
 
 -- Task events (state transitions — drives cascade animation)
-create table task_events (
+create table if not exists task_events (
   id uuid primary key default gen_random_uuid(),
   task_id text references tasks(id),
   old_state text,
@@ -84,7 +84,7 @@ create table task_events (
 );
 
 -- Alerts (fired by routing/dispatcher layer)
-create table alerts (
+create table if not exists alerts (
   id uuid primary key default gen_random_uuid(),
   task_id text references tasks(id),
   target_role text,
@@ -96,7 +96,7 @@ create table alerts (
 );
 
 -- Resolution cache (exact-match LLM cost optimization)
-create table resolution_cache (
+create table if not exists resolution_cache (
   cache_key text primary key,
   resolved_state text,
   resolved_failure_type text,
@@ -107,15 +107,33 @@ create table resolution_cache (
 -- ============================================
 -- SUPABASE REALTIME
 -- ============================================
-alter publication supabase_realtime add table tasks;
-alter publication supabase_realtime add table task_events;
-alter publication supabase_realtime add table alerts;
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and tablename = 'tasks'
+  ) then
+    alter publication supabase_realtime add table tasks;
+  end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and tablename = 'task_events'
+  ) then
+    alter publication supabase_realtime add table task_events;
+  end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and tablename = 'alerts'
+  ) then
+    alter publication supabase_realtime add table alerts;
+  end if;
+end $$;
 
 -- ============================================
 -- INDEXES
 -- ============================================
-create index idx_tasks_project_id on tasks(project_id);
-create index idx_tasks_state on tasks(state);
-create index idx_task_events_task_id on task_events(task_id);
-create index idx_task_events_created_at on task_events(created_at desc);
-create index idx_alerts_status on alerts(status);
+create index if not exists idx_tasks_project_id on tasks(project_id);
+create index if not exists idx_tasks_state on tasks(state);
+create index if not exists idx_task_events_task_id on task_events(task_id);
+create index if not exists idx_task_events_created_at on task_events(created_at desc);
+create index if not exists idx_alerts_status on alerts(status);

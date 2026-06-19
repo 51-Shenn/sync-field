@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "run-sql-file": "dotenv -e .env -- npx supabase db query --linked --file",
+    "run-sql": "dotenv -e .env -- npx supabase db query --linked",
+    "supabase-link": "npx supabase link --project-ref vjebihxnmapvqdxhpdfy"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
@@ -26,9 +29,11 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
+    "dotenv-cli": "^11.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "prisma": "^7.8.0",
+    "supabase": "^2.107.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
