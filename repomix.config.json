@@ -1,0 +1,39 @@
+{
+  "output": {
+    "filePath": "repomix-output.xml",
+    "style": "xml",
+    "parsableStyle": true,
+    "headerText": "Imagine-Hack — Field Operations DAG Engine + Next.js Frontend",
+    "instructionFilePath": "AGENTS.md",
+    "removeComments": false,
+    "removeEmptyLines": false,
+    "topFilesLength": 15,
+    "showLineNumbers": true
+  },
+  "include": [
+    "**/*.py",
+    "**/*.ts",
+    "**/*.tsx",
+    "**/*.sql",
+    "**/*.json",
+    "**/*.mjs",
+    "**/*.css",
+    "**/*.prisma",
+    "**/*.toml"
+  ],
+  "ignore": {
+    "useGitignore": true,
+    "customPatterns": [
+      "repomix-output.xml",
+      "package-lock.json",
+      ".venv/",
+      "__pycache__/",
+      "*.pyc",
+      "*.session*",
+      "downloads/",
+      "node_modules/",
+      ".next/",
+      "src/generated/prisma/"
+    ]
+  }
+}

@@ -96,6 +96,11 @@ class VRPSolver:
         if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
             for (tech_id, task_id), var in x.items():
                 if solver.Value(var) == 1:
-                    results.append(Assignment(tech_id, task_id, solver.ObjectiveValue()))
+                    tech = self.technicians[tech_id]
+                    task = ready_tasks[task_id]
+                    priority = self.engine.compute_priority(task_id).score
+                    distance_penalty = self._distance(tech, task) * 5.0
+                    individual_score = round(priority - distance_penalty, 2)
+                    results.append(Assignment(tech_id, task_id, individual_score))
 
         return results

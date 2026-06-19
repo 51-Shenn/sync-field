@@ -36,7 +36,8 @@ class FieldOpsDispatcher:
                 self.notifier.notify(tech_id, "No eligible task available — standby.")
 
         for t in decision["affected_technicians"]:
-            self.engine.tasks[t["task_id"]]["assigned_to"] = None
+            if t["technician_id"] in assigned_techs:
+                self.engine.tasks[t["task_id"]]["assigned_to"] = None
 
         decision["rerouting_results"] = [
             {"technician_id": a.technician_id, "new_task": a.task_id} for a in assignments
