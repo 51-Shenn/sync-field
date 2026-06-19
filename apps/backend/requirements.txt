@@ -2,3 +2,4 @@ telethon>=1.37,<2
 python-dotenv>=1.0,<2
 faster-whisper>=1.0,<2
 supabase>=2.0,<3
+ortools>=9.15,<10
