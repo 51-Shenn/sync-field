@@ -58,4 +58,22 @@ def process_message(message: dict, telegram_id=None) -> dict | None:
         "tier_resolved": "llm",
     }).execute()
 
+    task_id = resolve_task_id(sb, result.get("task_name"))
+    confidence = CONFIDENCE_MAP.get(result.get("confidence"), 0.5)
+
+    if task_id and confidence == 1.0:
+        label = result.get("label")
+        status = result.get("status")
+
+        new_state = None
+        if label == "task_completion" and status == "done":
+            new_state = "COMPLETE"
+        elif label == "issue_report" or status == "blocked":
+            new_state = "BLOCKED"
+        elif label == "task_start" and status == "in_progress":
+            new_state = "ACTIVE"
+
+        if new_state:
+            sb.table("tasks").update({"state": new_state}).eq("id", task_id).execute()
+
     return result

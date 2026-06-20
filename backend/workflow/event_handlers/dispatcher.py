@@ -80,6 +80,54 @@ class FieldOpsDispatcher:
                 f"You will be notified when status updates."
             )
 
+    def process_completion_report(self, task_id: str, technician_id: str) -> dict:
+        """
+        Processes a manual or automated task completion. Updates DAG state
+        and triggers joint VRP reassignments for newly unlocked READY tasks.
+        """
+        events = self.engine.update_task_state(
+            task_id, "COMPLETE", f"Completion reported by {technician_id}"
+        )
+
+        unlocked_task_ids = [
+            e["task_id"] for e in events
+            if e["new_state"] == "READY"
+        ]
+
+        active_assignments = {
+            t.get("assigned_to") for t in self.engine.tasks.values()
+            if t.get("assigned_to") and t["state"] in ("ACTIVE", "READY")
+        }
+        idle_tech_ids = [
+            tech_id for tech_id in self.solver.technicians
+            if tech_id not in active_assignments
+        ]
+
+        assignments = []
+        if idle_tech_ids:
+            assignments = self.solver.solve_reassignment(idle_tech_ids, exclude_tasks=set())
+
+            for a in assignments:
+                self.engine.tasks[a.task_id]["assigned_to"] = a.technician_id
+                self.notifier.notify(
+                    a.technician_id,
+                    f"Task {a.task_id} unlocked and assigned (priority score {a.score:.1f})"
+                )
+
+        for tech_id in idle_tech_ids:
+            if tech_id not in {a.technician_id for a in assignments}:
+                self.notifier.notify(tech_id, "No eligible newly-unlocked task — standby.")
+
+        return {
+            "task_id": task_id,
+            "events_triggered": len(events),
+            "unlocked_tasks": unlocked_task_ids,
+            "new_assignments": [
+                {"technician_id": a.technician_id, "task_id": a.task_id}
+                for a in assignments
+            ],
+        }
+
     def handle_absence(self, technician_id: str, now_hour: float = 9.0) -> dict:
         orphaned = [
             {"task_id": t_id, "state": t["state"]}

@@ -65,9 +65,12 @@ class TechnicianSchedule:
         for w in self.windows:
             if w.start >= when:
                 new_windows.append(AvailabilityWindow(w.start + by, w.end + by, w.source, confirmed))
+            elif w.start < when < w.end:
+                new_windows.append(AvailabilityWindow(w.start, when, w.source, w.confirmed))
+                new_windows.append(AvailabilityWindow(when + by, w.end + by, w.source, confirmed))
             else:
                 new_windows.append(w)
-        self.windows = new_windows
+        self.windows = sorted(new_windows, key=lambda w: w.start)
 
 # Define the explicit physical-world state space
 VALID_STATES = {
