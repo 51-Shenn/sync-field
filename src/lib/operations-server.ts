@@ -15,6 +15,7 @@ import type {
 } from "@/lib/operations-types";
 import type { SiteReport } from "@/lib/report-types";
 import type { DocumentFile } from "@/lib/document-types";
+import type { AuditLog } from "@/lib/audit-types";
 
 type Row = Record<string, unknown>;
 
@@ -129,6 +130,12 @@ export async function getOperationsSnapshot(): Promise<OperationsSnapshot> {
     projectId: stringValue(row.project_id), uploadedBy: stringValue(row.uploaded_by),
     uploadedAt: stringValue(row.created_at), sizeKb: numberValue(row.size_kb),
   }));
+  const auditLogs: AuditLog[] = (snap.audit_logs || []).map((row) => ({
+    id: stringValue(row.id), action: stringValue(row.action) as AuditLog["action"],
+    entity: stringValue(row.entity), entityId: stringValue(row.entity_id),
+    entityName: stringValue(row.entity_name), performedBy: stringValue(row.performed_by),
+    timestamp: stringValue(row.created_at), details: stringValue(row.details ?? ""),
+  }));
 
-  return { projects, tasks, subtasks, technicians, taskEvents, alerts, processedMessages, commands, reports, documents };
+  return { projects, tasks, subtasks, technicians, taskEvents, alerts, processedMessages, commands, reports, documents, auditLogs };
 }

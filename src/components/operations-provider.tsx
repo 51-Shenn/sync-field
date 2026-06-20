@@ -7,6 +7,7 @@ import type { OperationsCommandInput, OperationsSnapshot } from "@/lib/operation
 type OperationsContextValue = {
   snapshot: OperationsSnapshot;
   loading: boolean;
+  isInitializing: boolean;
   error: string;
   refresh: () => Promise<void>;
   issueCommand: (command: OperationsCommandInput) => Promise<string>;
@@ -23,7 +24,7 @@ type OperationsContextValue = {
 
 const emptySnapshot: OperationsSnapshot = {
   projects: [], tasks: [], subtasks: [], technicians: [], taskEvents: [], alerts: [], processedMessages: [], commands: [],
-  reports: [], documents: [],
+  reports: [], documents: [], auditLogs: [],
 };
 
 const OperationsContext = createContext<OperationsContextValue | null>(null);
@@ -38,6 +39,7 @@ async function requestJson(url: string, init?: RequestInit) {
 export function OperationsProvider({ children }: { children: React.ReactNode }) {
   const [snapshot, setSnapshot] = useState(emptySnapshot);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState("");
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -45,6 +47,7 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
     try {
       const next = await requestJson("/api/operations/snapshot", { cache: "no-store" }) as OperationsSnapshot;
       setSnapshot(next);
+      setInitialized(true);
       setError("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to load operations");
@@ -84,7 +87,7 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
   }, []);
 
   const value = useMemo<OperationsContextValue>(() => ({
-    snapshot, loading, error, refresh,
+    snapshot, loading, isInitializing: loading && !initialized, error, refresh,
     issueCommand: async (command) => {
       const result = await requestJson("/api/operations/commands", { method: "POST", body: JSON.stringify(command) }) as { commandId: string };
       return result.commandId;

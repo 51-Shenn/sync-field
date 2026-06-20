@@ -64,6 +64,11 @@ begin
       select json_agg(row_to_json(t)) from (
         select * from documents order by created_at desc limit 50
       ) t
+    ), '[]'::json),
+    'audit_logs', coalesce((
+      select json_agg(row_to_json(t)) from (
+        select * from audit_logs order by created_at desc limit 100
+      ) t
     ), '[]'::json)
   ) into result;
 

@@ -8,9 +8,9 @@ import { ProjectDetailTimeline } from "@/components/project-detail-timeline";
 import { Avatar, Badge, Card, CardContent, Progress, Tabs } from "@/components/ui";
 
 export function ProjectDetailView({ projectId }: { projectId: string }) {
-  const { snapshot, loading, error } = useOperations();
+  const { snapshot, isInitializing, error } = useOperations();
   const project = snapshot.projects.find((item) => item.id === projectId);
-  if (loading) return <Card className="p-16 text-center text-sm text-slate-500">Loading live project…</Card>;
+  if (isInitializing) return <Card className="p-16 text-center text-sm text-slate-500">Loading live project…</Card>;
   if (!project) return <Card className="p-16 text-center"><p className="font-semibold text-slate-900">Project not found</p><Link href="/projects" className="mt-3 inline-block text-sm text-orange-600">Back to projects</Link></Card>;
   const tasks = snapshot.tasks.filter((task) => task.projectId === project.id);
   const assignedIds = new Set(tasks.map((task) => task.assigneeId).filter(Boolean));

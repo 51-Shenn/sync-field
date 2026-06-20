@@ -12,7 +12,7 @@ type ProjectForm = Omit<OperationsProject, "id" | "progress" | "siteId">;
 const emptyProject = (): ProjectForm => ({ name: "", client: "", location: "", status: "planning", startDate: "", endDate: "", managerId: "", color: "#f97316", description: "" });
 
 export function ProjectsView() {
-  const { snapshot, loading, error, createProject, updateProject, deleteProject } = useOperations();
+  const { snapshot, isInitializing, error, createProject, updateProject, deleteProject } = useOperations();
   const [view, setView] = useState<"grid" | "table" | "timeline">("grid");
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
@@ -45,7 +45,7 @@ export function ProjectsView() {
     } catch (reason) { setFormError(reason instanceof Error ? reason.message : "Unable to save project"); }
   }
 
-  if (loading) return <Card className="p-10 text-center text-sm text-slate-500">Loading live projects…</Card>;
+  if (isInitializing) return <Card className="p-10 text-center text-sm text-slate-500">Loading live projects…</Card>;
 
   return <>
     {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}

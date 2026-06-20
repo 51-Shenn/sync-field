@@ -11,3 +11,4 @@ create index if not exists idx_task_events_created_at on task_events(created_at 
 create index if not exists idx_alerts_created_at on alerts(created_at desc);
 create index if not exists idx_processed_messages_created_at on processed_messages(created_at desc);
 create index if not exists idx_task_commands_created_at on task_commands(created_at desc);
+create index if not exists idx_audit_logs_created_at on audit_logs(created_at desc);
