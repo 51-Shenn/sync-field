@@ -22,8 +22,7 @@ export async function DELETE(
   const session = await getRequiredSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  const { error } = await getSupabaseAdmin()
-    .from("alerts").delete().eq("id", id);
+  const { error } = await getSupabaseAdmin().from("alerts").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }

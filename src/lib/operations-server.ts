@@ -13,6 +13,9 @@ import type {
   TaskEvent,
   TaskState,
 } from "@/lib/operations-types";
+import type { SiteReport } from "@/lib/report-types";
+import type { DocumentFile } from "@/lib/document-types";
+import type { AuditLog } from "@/lib/audit-types";
 
 type Row = Record<string, unknown>;
 
@@ -31,32 +34,19 @@ function projectStatus(value: unknown): OperationsProject["status"] {
   return (["planning", "in_progress", "on_hold", "completed"].includes(String(value)) ? value : "planning") as OperationsProject["status"];
 }
 
-function rows(data: unknown): Row[] {
-  return Array.isArray(data) ? (data as Row[]) : [];
-}
-
-function assertQueries(queries: { error: { message: string } | null }[]) {
-  const failed = queries.find((query) => query.error);
-  if (failed?.error) throw new Error(failed.error.message);
-}
-
 export async function getOperationsSnapshot(): Promise<OperationsSnapshot> {
   const sb = getSupabaseAdmin();
-  const results = await Promise.all([
-    sb.from("projects").select("*, sites(name,address)").order("created_at"),
-    sb.from("tasks").select("*").order("created_at"),
-    sb.from("subtasks").select("*").order("created_at"),
-    sb.from("technicians").select("*").order("name"),
-    sb.from("task_events").select("*").order("created_at", { ascending: false }).limit(100),
-    sb.from("alerts").select("*").order("created_at", { ascending: false }).limit(50),
-    sb.from("processed_messages").select("*").order("created_at", { ascending: false }).limit(50),
-    sb.from("task_commands").select("*").order("created_at", { ascending: false }).limit(50),
-  ]);
-  assertQueries(results);
+  const { data, error } = await sb.rpc("get_operations_snapshot");
+  if (error) throw new Error(error.message);
 
-  const taskRows = rows(results[1].data);
+  const snap = data as Record<string, Row[]>;
+  const rawTasks     = snap.tasks || [];
+  const rawSubtasks  = snap.subtasks || [];
+  const rawSiteReports = snap.site_reports || [];
+  const rawDocuments = snap.documents || [];
+
   const completedByProject = new Map<string, { complete: number; total: number }>();
-  for (const task of taskRows) {
+  for (const task of rawTasks) {
     const projectId = stringValue(task.project_id);
     const count = completedByProject.get(projectId) ?? { complete: 0, total: 0 };
     count.total += 1;
@@ -64,7 +54,7 @@ export async function getOperationsSnapshot(): Promise<OperationsSnapshot> {
     completedByProject.set(projectId, count);
   }
 
-  const projects: OperationsProject[] = rows(results[0].data).map((row) => {
+  const projects: OperationsProject[] = (snap.projects || []).map((row: Row) => {
     const site = row.sites && typeof row.sites === "object" ? row.sites as Row : {};
     const counts = completedByProject.get(stringValue(row.id)) ?? { complete: 0, total: 0 };
     return {
@@ -78,7 +68,7 @@ export async function getOperationsSnapshot(): Promise<OperationsSnapshot> {
     };
   });
 
-  const tasks: OperationsTask[] = taskRows.map((row) => ({
+  const tasks: OperationsTask[] = rawTasks.map((row) => ({
     id: stringValue(row.id), projectId: stringValue(row.project_id), title: stringValue(row.task_name),
     state: stringValue(row.state, "LOCKED") as TaskState,
     dependencies: Array.isArray(row.dependencies) ? row.dependencies.map(String) : [],
@@ -91,13 +81,13 @@ export async function getOperationsSnapshot(): Promise<OperationsSnapshot> {
     estimatedDurationHours: numberValue(row.estimated_duration_hours, 2),
   }));
 
-  const subtasks: OperationsSubtask[] = rows(results[2].data).map((row) => ({
-    id: stringValue(row.id), taskId: stringValue(row.task_id), title: stringValue(row.title),
+  const subtasks: OperationsSubtask[] = rawSubtasks.map((row) => ({
+    id: stringValue(row.id), taskId: stringValue(row.taskId || row.task_id), title: stringValue(row.title),
     status: stringValue(row.status, "todo") as OperationsSubtask["status"],
-    assigneeId: stringValue(row.assignee_id), dueDate: stringValue(row.due_date),
+    assigneeId: stringValue(row.assigneeId || row.assignee_id), dueDate: stringValue(row.dueDate || row.due_date),
   }));
 
-  const technicians: OperationsTechnician[] = rows(results[3].data).map((row) => ({
+  const technicians: OperationsTechnician[] = (snap.technicians || []).map((row) => ({
     id: stringValue(row.id), name: stringValue(row.name), phone: stringValue(row.phone), role: stringValue(row.role),
     skills: Array.isArray(row.skills) ? row.skills.map(String) : [], status: stringValue(row.status),
     email: stringValue(row.email), projectIds: Array.isArray(row.project_ids) ? row.project_ids.map(String) : [],
@@ -105,28 +95,47 @@ export async function getOperationsSnapshot(): Promise<OperationsSnapshot> {
     lat: typeof row.lat === "number" ? row.lat : null, lng: typeof row.lng === "number" ? row.lng : null,
   }));
 
-  const taskEvents: TaskEvent[] = rows(results[4].data).map((row) => ({
+  const taskEvents: TaskEvent[] = (snap.task_events || []).map((row) => ({
     id: stringValue(row.id), taskId: stringValue(row.task_id), oldState: typeof row.old_state === "string" ? row.old_state : null,
     newState: stringValue(row.new_state), reason: stringValue(row.reason), triggeredBy: stringValue(row.triggered_by),
     depth: numberValue(row.depth), createdAt: stringValue(row.created_at),
   }));
-  const alerts: OperationsAlert[] = rows(results[5].data).map((row) => ({
+  const alerts: OperationsAlert[] = (snap.alerts || []).map((row) => ({
     id: stringValue(row.id), taskId: typeof row.task_id === "string" ? row.task_id : null,
     category: stringValue(row.category), message: stringValue(row.message), status: stringValue(row.status), createdAt: stringValue(row.created_at),
   }));
-  const processedMessages: ProcessedMessage[] = rows(results[6].data).map((row) => ({
+  const processedMessages: ProcessedMessage[] = (snap.processed_messages || []).map((row) => ({
     id: stringValue(row.id), taskId: typeof row.task_id === "string" ? row.task_id : null,
     label: typeof row.label === "string" ? row.label : null, status: typeof row.status === "string" ? row.status : null,
     note: typeof row.note === "string" ? row.note : null, confidence: typeof row.confidence === "number" ? row.confidence : null,
     createdAt: stringValue(row.created_at),
   }));
-  const commands: TaskCommand[] = rows(results[7].data).map((row) => ({
+  const commands: TaskCommand[] = (snap.task_commands || []).map((row) => ({
     id: stringValue(row.id), commandType: stringValue(row.command_type), taskId: typeof row.task_id === "string" ? row.task_id : null,
     projectId: typeof row.project_id === "string" ? row.project_id : null,
     status: stringValue(row.status, "pending") as TaskCommand["status"],
     result: row.result && typeof row.result === "object" ? row.result as Record<string, unknown> : null,
     error: typeof row.error === "string" ? row.error : null, createdAt: stringValue(row.created_at),
   }));
+  const reports: SiteReport[] = rawSiteReports.map((row) => ({
+    id: stringValue(row.id), projectId: stringValue(row.project_id), title: stringValue(row.title),
+    type: stringValue(row.report_type, "update") as SiteReport["type"],
+    description: stringValue(row.description ?? ""), status: stringValue(row.status, "open") as SiteReport["status"],
+    createdBy: stringValue(row.created_by), createdAt: stringValue(row.created_at),
+    attachments: Array.isArray(row.attachments) ? row.attachments.map(String) : [],
+  }));
+  const documents: DocumentFile[] = rawDocuments.map((row) => ({
+    id: stringValue(row.id), name: stringValue(row.name),
+    type: stringValue(row.document_type, "pdf") as DocumentFile["type"],
+    projectId: stringValue(row.project_id), uploadedBy: stringValue(row.uploaded_by),
+    uploadedAt: stringValue(row.created_at), sizeKb: numberValue(row.size_kb),
+  }));
+  const auditLogs: AuditLog[] = (snap.audit_logs || []).map((row) => ({
+    id: stringValue(row.id), action: stringValue(row.action) as AuditLog["action"],
+    entity: stringValue(row.entity), entityId: stringValue(row.entity_id),
+    entityName: stringValue(row.entity_name), performedBy: stringValue(row.performed_by),
+    timestamp: stringValue(row.created_at), details: stringValue(row.details ?? ""),
+  }));
 
-  return { projects, tasks, subtasks, technicians, taskEvents, alerts, processedMessages, commands };
+  return { projects, tasks, subtasks, technicians, taskEvents, alerts, processedMessages, commands, reports, documents, auditLogs };
 }

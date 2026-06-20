@@ -1,55 +1,74 @@
-# Telegram bot entry point
-#   - Connects as a bot user via Telethon
-#   - Wires the DAG dispatcher for realtime absence handling
-#   - Fetches recent chat history (if admin)
-#   - Listens for incoming messages and processes them
-#   - Serves HTTP endpoints for outbound messages
-import sys
-from pathlib import Path
-
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
-
 import asyncio
-import signal
 
 from telethon import TelegramClient
 
-from . import config
-from .history import fetch_history
-from .listener import setup_listener
-from .http_server import start_http_server
-
-from backend.integrations.supabase.client import get_supabase_client
-from backend.workflow.dag_engine.dag_engine import SyncFieldDAG
+from backend.integrations.telegram import config
+from backend.integrations.telegram.history import fetch_history
+from backend.integrations.telegram.listener import setup_listener
+from backend.integrations.supabase.client import get_supabase_client, get_supabase_async_client
+from backend.workflow.dag_engine.dag_engine import (
+    SyncFieldDAG,
+    TechnicianSchedule,
+    AvailabilityWindow,
+)
 from backend.optimization.vrp_solver.solver import VRPSolver
-from backend.integrations.notifications.telegram_notifier import TelegramNotifier
+from backend.integrations.notifications.stub import StubNotifier
 from backend.workflow.event_handlers.dispatcher import FieldOpsDispatcher
-from llm.pipeline import set_dispatcher
+from backend.workflow.event_handlers.event_bus import (
+    SupabaseEventBus,
+    RealtimeEventBusListener,
+)
+from backend.workflow.command_processor import (
+    CommandProcessor,
+    CommandQueueListener,
+    hydrate_task_rows,
+)
+from backend.llm.pipeline import set_dispatcher
+from datetime import datetime
 
 
-def _wire_dispatcher():
-    sb = get_supabase_client()
-
-    db_tasks = sb.table("tasks").select("*").execute().data or []
-    for t in db_tasks:
-        t.setdefault("task_id", t.pop("id", None))
-    engine = SyncFieldDAG(db_tasks)
-
-    tech_data = sb.table("technicians").select("*").execute().data or []
-    tech_db = {t["id"]: t for t in tech_data}
-
-    solver = VRPSolver(engine, tech_db)
-    notifier = TelegramNotifier(
-        bot_http_url=f"http://localhost:{config.HTTP_PORT}",
-        auth_token=config.HTTP_AUTH_TOKEN,
-    )
-    dispatcher = FieldOpsDispatcher(engine, solver, notifier, sb_client=sb)
-    set_dispatcher(dispatcher)
-    print(f"[Dispatcher] Wired — {len(db_tasks)} tasks, {len(tech_db)} technicians loaded")
-    return dispatcher
+def _build_schedules(tech_data: list) -> dict:
+    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+    schedules = {}
+    for t in tech_data:
+        shift_start = t.get("shift_start") or "08:00"
+        shift_end = t.get("shift_end") or "18:00"
+        sh, sm = (int(p) for p in shift_start.split(":")[:2])
+        eh, em = (int(p) for p in shift_end.split(":")[:2])
+        window = AvailabilityWindow(
+            start=today.replace(hour=sh, minute=sm),
+            end=today.replace(hour=eh, minute=em),
+            source="shift",
+            confirmed=True,
+        )
+        schedules[t["id"]] = TechnicianSchedule([window])
+    return schedules
 
 
 async def main() -> None:
+    sb_client = get_supabase_client()
+
+    db_tasks = sb_client.table("tasks").select("*").execute().data or []
+    engine = SyncFieldDAG(hydrate_task_rows(db_tasks))
+
+    tech_data = sb_client.table("technicians").select("*").execute().data or []
+    tech_db = {t["id"]: t for t in tech_data}
+    schedules = _build_schedules(tech_data)
+
+    solver = VRPSolver(engine, tech_db)
+    notifier = StubNotifier(sb_client)
+    dispatcher = FieldOpsDispatcher(engine, solver, notifier, sb_client=sb_client)
+    set_dispatcher(dispatcher)
+
+    event_bus = SupabaseEventBus(dispatcher, sb_client)
+    async_sb = await get_supabase_async_client()
+    realtime_listener = RealtimeEventBusListener(event_bus, async_sb=async_sb)
+    realtime_listener.start_sync()
+    command_processor = CommandProcessor(dispatcher, solver, sb_client)
+    command_processor.reload_graph()
+    command_listener = CommandQueueListener(command_processor, async_sb)
+    command_listener.start_sync()
+
     client = TelegramClient(
         session="bot_session",
         api_id=config.API_ID,
@@ -60,32 +79,22 @@ async def main() -> None:
     chat = await client.get_entity(int(config.TARGET_CHAT))
     print(f"Connected to: {chat.title if hasattr(chat, 'title') else chat.id}")
 
+    # Pass raw chat ID — send_message works with int IDs, not entity objects
+    notifier.bind_telegram(client, int(config.TARGET_CHAT), asyncio.get_running_loop())
+
     try:
         await fetch_history(client, chat, limit=50)
     except Exception as e:
         print(f"Skipping history (bot not admin?): {e}")
 
-    _wire_dispatcher()
-
     await setup_listener(client)
-    site = await start_http_server(client)
 
-    stop_event = asyncio.Event()
-
-    def _shutdown():
-        stop_event.set()
-
-    loop = asyncio.get_running_loop()
-    for sig in (signal.SIGTERM, signal.SIGINT):
-        try:
-            loop.add_signal_handler(sig, _shutdown)
-        except NotImplementedError:
-            pass
-
-    await stop_event.wait()
-    print("Shutting down...")
-    await site.stop()
-    await client.disconnect()
+    try:
+        await client.run_until_disconnected()
+    finally:
+        print("\n[Bot] Shutting down. Cleaning up Event Bus channels...")
+        await realtime_listener.stop()
+        await command_listener.stop()
 
 
 if __name__ == "__main__":

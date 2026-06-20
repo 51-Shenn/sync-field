@@ -15,7 +15,7 @@ const emptyReport = (): Omit<SiteReport, "id" | "createdAt"> => ({ projectId: ""
 
 export function ControlCentreView() {
   const { data: session } = authClient.useSession();
-  const { snapshot, loading, error, refresh } = useOperations();
+  const { snapshot, isInitializing, error, refresh } = useOperations();
   const { reports, createReport: pushReport } = useSiteReports();
   const [reportOpen, setReportOpen] = useState(false);
   const [reportForm, setReportForm] = useState(emptyReport());
@@ -37,7 +37,14 @@ export function ControlCentreView() {
     } catch { /* silently handled */ }
   }
 
-  if (loading) return <Card className="p-16 text-center text-sm text-slate-500">Loading live operations…</Card>;
+  async function deleteAlert(id: string) {
+    try {
+      await fetch(`/api/alerts/${id}`, { method: "DELETE" });
+      await refresh();
+    } catch { /* silently handled */ }
+  }
+
+  if (isInitializing) return <Card className="p-16 text-center text-sm text-slate-500">Loading live operations…</Card>;
   return <>
     <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="mb-1 text-xs font-semibold uppercase tracking-[.15em] text-orange-600">{today}</p><h2 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Good morning, <span className="text-orange-600">{userName}</span></h2><p className="mt-1 text-sm text-slate-500">Live project, DAG, workforce, alert, and Telegram pipeline status.</p></div><div className="flex gap-2"><Button variant="outline" onClick={() => void refresh()}>Refresh</Button><Dialog open={reportOpen} onOpenChange={setReportOpen} trigger={<Button><IconClipboardCheck className="size-4" />Create report</Button>} title="Create site report"><form className="space-y-4" onSubmit={(event) => { event.preventDefault(); createReport(); }}><div><Label>Type</Label><Select value={reportForm.type} onChange={(event) => setReportForm({ ...reportForm, type: event.target.value as SiteReport["type"] })}><option value="update">Update</option><option value="issue">Issue</option></Select></div><div><Label>Title</Label><Input required value={reportForm.title} onChange={(event) => setReportForm({ ...reportForm, title: event.target.value })} /></div><div><Label>Project</Label><Select required value={reportForm.projectId} onChange={(event) => setReportForm({ ...reportForm, projectId: event.target.value })}><option value="">Select project</option>{snapshot.projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</Select></div><div><Label>Description</Label><Textarea required value={reportForm.description} onChange={(event) => setReportForm({ ...reportForm, description: event.target.value })} /></div><div className="flex justify-end"><Button type="submit">Create report</Button></div></form></Dialog></div></div>
     {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
@@ -57,6 +64,7 @@ export function ControlCentreView() {
                   <p className="mt-1 text-xs text-red-700">{alert.message}</p>
                 </div>
                 <button onClick={() => resolveAlert(alert.id)} className="shrink-0 rounded p-1 text-red-400 hover:bg-red-100 hover:text-red-600" title="Dismiss" aria-label="Dismiss alert"><IconX className="size-3.5" /></button>
+                <button onClick={() => deleteAlert(alert.id)} className="shrink-0 rounded p-1 text-red-400 hover:bg-red-100 hover:text-red-600" title="Delete" aria-label="Delete alert"><IconX className="size-3.5" /></button>
               </div>
             ))}
             {snapshot.commands.filter((command) => command.status === "failed").slice(0, 5).map((command) => (

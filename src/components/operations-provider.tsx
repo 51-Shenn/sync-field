@@ -7,6 +7,7 @@ import type { OperationsCommandInput, OperationsSnapshot } from "@/lib/operation
 type OperationsContextValue = {
   snapshot: OperationsSnapshot;
   loading: boolean;
+  isInitializing: boolean;
   error: string;
   refresh: () => Promise<void>;
   issueCommand: (command: OperationsCommandInput) => Promise<string>;
@@ -23,6 +24,7 @@ type OperationsContextValue = {
 
 const emptySnapshot: OperationsSnapshot = {
   projects: [], tasks: [], subtasks: [], technicians: [], taskEvents: [], alerts: [], processedMessages: [], commands: [],
+  reports: [], documents: [], auditLogs: [],
 };
 
 const OperationsContext = createContext<OperationsContextValue | null>(null);
@@ -37,6 +39,7 @@ async function requestJson(url: string, init?: RequestInit) {
 export function OperationsProvider({ children }: { children: React.ReactNode }) {
   const [snapshot, setSnapshot] = useState(emptySnapshot);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState("");
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -44,6 +47,7 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
     try {
       const next = await requestJson("/api/operations/snapshot", { cache: "no-store" }) as OperationsSnapshot;
       setSnapshot(next);
+      setInitialized(true);
       setError("");
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Unable to load operations");
@@ -54,12 +58,12 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
 
   const scheduleRefresh = useCallback(() => {
     if (refreshTimer.current) clearTimeout(refreshTimer.current);
-    refreshTimer.current = setTimeout(() => void refresh(), 120);
+    refreshTimer.current = setTimeout(() => void refresh(), 500);
   }, [refresh]);
 
   useEffect(() => {
     const initialRefresh = setTimeout(() => void refresh(), 0);
-    const pollingFallback = setInterval(() => void refresh(), 10_000);
+    const pollingFallback = setInterval(() => void refresh(), 30_000);
     const sb = getSupabaseBrowser();
     if (!sb) return () => { clearTimeout(initialRefresh); clearInterval(pollingFallback); };
     const channel = sb.channel("syncfield-operations");
@@ -79,14 +83,13 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
 
   const mutate = useCallback(async (url: string, method: string, body?: Record<string, unknown>) => {
     await requestJson(url, { method, body: body ? JSON.stringify(body) : undefined });
-    await refresh();
-  }, [refresh]);
+    // Realtime CDC will trigger refresh when the DB change propagates.
+  }, []);
 
   const value = useMemo<OperationsContextValue>(() => ({
-    snapshot, loading, error, refresh,
+    snapshot, loading, isInitializing: loading && !initialized, error, refresh,
     issueCommand: async (command) => {
       const result = await requestJson("/api/operations/commands", { method: "POST", body: JSON.stringify(command) }) as { commandId: string };
-      await refresh();
       return result.commandId;
     },
     createProject: (project) => mutate("/api/projects", "POST", project),
