@@ -18,6 +18,7 @@ from . import config
 from .document_processor import detect_file_type, ocr_image_file
 from .ocr_queue import get_queue
 from .transcribe import preload_model, translate_audio
+from integrations.google_drive import get_uploader, init_uploader
 from integrations.supabase.client import get_supabase_client
 from llm.pipeline import process_message
 
@@ -31,9 +32,22 @@ async def _analyze_and_log(message: dict, telegram_id) -> None:
         print(json.dumps({**message, "error": str(e)}, ensure_ascii=False))
 
 
+async def _upload_to_drive(file_path: str, file_name: str, sender_name: str) -> str | None:
+    uploader = get_uploader()
+    if uploader is None:
+        return None
+    return await asyncio.to_thread(uploader.upload, file_path, file_name, sender_name)
+
+
 async def setup_listener(client: TelegramClient) -> None:
     DOWNLOAD_DIR.mkdir(exist_ok=True)
     preload_model()
+
+    if config.GOOGLE_DRIVE_TOKEN_PATH and config.GOOGLE_DRIVE_ROOT_FOLDER_ID:
+        init_uploader(str(config.GOOGLE_DRIVE_TOKEN_PATH), config.GOOGLE_DRIVE_ROOT_FOLDER_ID)
+        print(f"Google Drive uploader ready → root folder {config.GOOGLE_DRIVE_ROOT_FOLDER_ID}")
+    else:
+        print("Google Drive uploader not configured — skipping Drive uploads")
 
     @client.on(events.CallbackQuery)
     async def callback_handler(event) -> None:
@@ -123,6 +137,7 @@ async def setup_listener(client: TelegramClient) -> None:
                 ts_file = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
                 tmp = DOWNLOAD_DIR / f"doc_{event.chat_id}_{ts_file}{Path(filename).suffix}"
                 await client.download_media(event.message, file=str(tmp))
+                await _upload_to_drive(str(tmp), filename, name)
                 get_queue().enqueue(str(tmp), event.chat_id, event.message.id,
                                      name, event.date, chat_title, telegram_id)
                 return
@@ -137,7 +152,11 @@ async def setup_listener(client: TelegramClient) -> None:
             photo_path = DOWNLOAD_DIR / fname
             await client.download_media(event.message, file=str(photo_path))
             try:
-                ocr_text = ocr_image_file(str(photo_path))
+                ocr_task = asyncio.to_thread(ocr_image_file, str(photo_path))
+                drive_task = _upload_to_drive(str(photo_path), fname, name)
+                ocr_text, _ = await asyncio.gather(ocr_task, drive_task, return_exceptions=True)
+                if isinstance(ocr_text, Exception):
+                    raise ocr_text
                 if ocr_text.strip():
                     message = {"sender_name": name, "sent_at": sent_at_iso, "chat_title": chat_title, "type": "photo", "text": ocr_text}
                     await _analyze_and_log(message, telegram_id)
