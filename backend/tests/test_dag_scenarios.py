@@ -259,6 +259,28 @@ if __name__ == "__main__":
 
     print("\n  Cascade timing verified: T04/T05 start = T03 finish, T06 starts after max(T04, T05)")
 
+    # Case C: All deps COMPLETE → must not falsely return UNKNOWN
+    fresh2 = [{**t, "state": "LOCKED", "assigned_to": None, "attempt_count": 0, "failure_category": None} for t in all_tasks]
+    engine5c = SyncFieldDAG(fresh2)
+    engine5c.update_task_state("T01", "ACTIVE")
+    engine5c.update_task_state("T01", "COMPLETE")
+    engine5c.update_task_state("T02", "ACTIVE")
+    engine5c.update_task_state("T02", "COMPLETE")
+    engine5c.tasks["T03"]["resolution_eta"] = datetime.now()
+    engine5c.tasks["T03"]["eta_confidence"] = "EXACT"
+
+    eta_c = engine5c.compute_cascade_eta("T03")
+    print("\nCase C: T03 blocked, T01/T02 COMPLETE (all deps done)")
+    for t_id in ["T03", "T04", "T05", "T06", "T07", "T08"]:
+        conf = eta_c[t_id]["eta_confidence"]
+        start = eta_c[t_id].get("earliest_start")
+        print(f"  {t_id}: confidence={conf}" + (f", start={start.strftime('%d %b %H:%M')}" if start else ", start=None"))
+
+    assert eta_c["T03"]["eta_confidence"] == "EXACT", f"T03 should be EXACT, got {eta_c['T03']['eta_confidence']}"
+    assert eta_c["T04"]["eta_confidence"] == "EXACT", f"T04 with all deps COMPLETE must be EXACT, got {eta_c['T04']['eta_confidence']}"
+    assert eta_c["T05"]["eta_confidence"] == "EXACT", f"T05 with all deps COMPLETE must be EXACT, got {eta_c['T05']['eta_confidence']}"
+    print("\n  Regression verified: all-COMPLETE dep set resolves to EXACT, not UNKNOWN")
+
     print("\n" + "=" * 60)
     print("ALL SCENARIOS PASSED")
     print("=" * 60)

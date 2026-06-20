@@ -217,7 +217,7 @@ class SyncFieldDAG:
             for dep in deps:
                 dep_task = self.tasks[dep]
                 if dep_task["state"] == "COMPLETE":
-                    continue
+                    upstream_etas.append(("EXACT", datetime.min))
                 elif dep_task.get("resolution_eta"):
                     dep_duration = dep_task.get("estimated_duration_hours", 2)
                     dep_finish = dep_task["resolution_eta"] + timedelta(hours=dep_duration)
