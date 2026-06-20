@@ -124,4 +124,4 @@ IoT equipment monitoring · material consumption tracking · fuel monitoring · 
 
 ## AI Usage
 
-Code assistance provided by Claude and ChatGPT.
+Code assistance provided by Claude Code and Codex.

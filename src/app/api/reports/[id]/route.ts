@@ -1,25 +1,27 @@
 import { NextResponse } from "next/server";
 import { getRequiredSession } from "@/lib/api-auth";
-import { getSiteReports, createSiteReport } from "@/lib/reports-server";
+import { updateSiteReport, deleteSiteReport } from "@/lib/reports-server";
 
-export async function GET() {
+export async function PUT(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getRequiredSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const reports = await getSiteReports();
-    return NextResponse.json(reports);
+    const { id } = await params;
+    const body = await request.json();
+    const report = await updateSiteReport(id, body);
+    return NextResponse.json(report);
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }
 }
 
-export async function POST(request: Request) {
+export async function DELETE(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await getRequiredSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
-    const body = await request.json();
-    const report = await createSiteReport({ ...body, createdBy: session.user.id, creatorName: session.user.name ?? "" });
-    return NextResponse.json(report, { status: 201 });
+    const { id } = await params;
+    await deleteSiteReport(id);
+    return NextResponse.json({ success: true });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });
   }

@@ -34,7 +34,7 @@ const emptyReport = (): ReportForm => ({
 export function SitesView() {
   const { projects } = useProjects();
   const { teamMembers } = useTeamMembers();
-  const { reports, createReport: pushReport } = useSiteReports();
+  const { reports, createReport: pushReport, updateReport, deleteReport } = useSiteReports();
   const [query, setQuery] = useState("");
   const [projectId, setProjectId] = useState("all");
   const [type, setType] = useState("all");
@@ -43,7 +43,6 @@ export function SitesView() {
   const [editing, setEditing] = useState<SiteReport | null>(null);
   const [editorOpen, setEditorOpen] = useState(false);
   const [formError, setFormError] = useState("");
-  const [attachInput, setAttachInput] = useState("");
   const [detail, setDetail] = useState<SiteReport | null>(null);
   const [pendingDelete, setPendingDelete] = useState<SiteReport | null>(null);
 
@@ -59,7 +58,6 @@ export function SitesView() {
   function resetEditor() {
     setForm(emptyReport());
     setEditing(null);
-    setAttachInput("");
     setFormError("");
   }
 
@@ -79,27 +77,34 @@ export function SitesView() {
       createdBy: report.createdBy,
       attachments: [...report.attachments],
     });
-    setAttachInput("");
     setFormError("");
     setDetail(null);
     setEditorOpen(true);
   }
 
-  function saveReport() {
+  async function saveReport() {
     if (!form.title.trim() || !form.projectId || !form.description.trim()) {
       setFormError("Title, project, and description are required.");
       return;
     }
-    pushReport(form);
-    setEditorOpen(false);
-    resetEditor();
+    setFormError("");
+    try {
+      if (editing) {
+        await updateReport(editing.id, form);
+      } else {
+        await pushReport(form);
+      }
+      setEditorOpen(false);
+      resetEditor();
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : "Failed to save report. Please try again.");
+    }
   }
 
-  function addAttachment() {
-    const attachment = attachInput.trim();
-    if (!attachment || form.attachments.includes(attachment)) return;
-    setForm({ ...form, attachments: [...form.attachments, attachment] });
-    setAttachInput("");
+  function addAttachments(files: FileList | null) {
+    if (!files) return;
+    const names = Array.from(files, (file) => file.name);
+    setForm({ ...form, attachments: [...new Set([...form.attachments, ...names])] });
   }
 
   function removeAttachment(index: number) {
@@ -130,10 +135,10 @@ export function SitesView() {
               <Input className="pl-9 pr-8" placeholder="Search title, description, project, attachment..." value={query} onChange={(e) => setQuery(e.target.value)} />
               {query && <button type="button" aria-label="Clear search" onClick={() => setQuery("")} className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100"><IconX className="size-4" /></button>}
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="min-w-[180px]"><option value="all">All projects</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select>
-              <Select value={type} onChange={(e) => setType(e.target.value)} className="min-w-[130px]"><option value="all">All types</option><option value="update">Updates</option><option value="issue">Issues</option></Select>
-              <Select value={status} onChange={(e) => setStatus(e.target.value)} className="min-w-[130px]"><option value="all">All statuses</option><option value="open">Open</option><option value="resolved">Resolved</option></Select>
+            <div className="flex flex-wrap items-center gap-2 xl:flex-nowrap">
+              <Select value={projectId} onChange={(e) => setProjectId(e.target.value)} className="!w-[220px] shrink-0"><option value="all">All projects</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select>
+              <Select value={type} onChange={(e) => setType(e.target.value)} className="!w-[140px] shrink-0"><option value="all">All types</option><option value="update">Updates</option><option value="issue">Issues</option></Select>
+              <Select value={status} onChange={(e) => setStatus(e.target.value)} className="!w-[140px] shrink-0"><option value="all">All statuses</option><option value="open">Open</option><option value="resolved">Resolved</option></Select>
               {hasFilters && <Button variant="ghost" onClick={clearFilters}><IconX className="size-4" />Clear</Button>}
               <Button onClick={openCreate}><IconPlus className="size-4" />New report</Button>
             </div>
@@ -146,7 +151,7 @@ export function SitesView() {
         {filtered.map((report) => {
           const project = projects.find((p) => p.id === report.projectId);
           const author = teamMembers.find((m) => m.id === report.createdBy);
-          return <Card key={report.id} className="transition-shadow hover:shadow-md"><CardContent><div className="flex flex-col gap-5 lg:flex-row lg:items-start"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><Badge>{report.type}</Badge><Badge value={report.status} /><span className="text-xs text-slate-400">{report.createdAt}</span></div><h3 className="mt-3 font-semibold text-slate-950">{report.title}</h3><p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{report.description}</p><div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-slate-500">{project && <span className="flex items-center gap-1.5"><span className="size-2 rounded-full" style={{ backgroundColor: project.color }} />{project.name}</span>}{author && <span className="flex items-center gap-1.5"><Avatar name={author.name} size="sm" />{author.name}</span>}{report.attachments.length > 0 && <span className="flex items-center gap-1.5"><IconPaperclip className="size-3.5" />{report.attachments.length} attachment{report.attachments.length === 1 ? "" : "s"}</span>}</div></div><div className="flex shrink-0 flex-wrap gap-1"><Button variant="ghost" size="sm" onClick={() => setDetail(report)}><IconEye className="size-4" />View</Button><Button variant="ghost" size="sm" onClick={() => openEdit(report)}><IconPencil className="size-4" />Edit</Button></div></div></CardContent></Card>;
+          return <Card key={report.id} className="transition-shadow hover:shadow-md"><CardContent><div className="flex flex-col gap-5 lg:flex-row lg:items-start"><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><Badge>{report.type}</Badge><Badge value={report.status} /><span className="text-xs text-slate-400">{report.createdAt}</span></div><h3 className="mt-3 font-semibold text-slate-950">{report.title}</h3><p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{report.description}</p><div className="mt-4 flex flex-wrap items-center gap-4 text-xs text-slate-500">{project && <span className="flex items-center gap-1.5"><span className="size-2 rounded-full" style={{ backgroundColor: project.color }} />{project.name}</span>}{author && <span className="flex items-center gap-1.5"><Avatar name={author.name} size="sm" />{author.name}</span>}{report.attachments.length > 0 && <span className="flex items-center gap-1.5"><IconPaperclip className="size-3.5" />{report.attachments.length} attachment{report.attachments.length === 1 ? "" : "s"}</span>}</div></div><div className="flex shrink-0 flex-wrap gap-1"><Button variant="ghost" size="sm" onClick={() => setDetail(report)}><IconEye className="size-4" />View</Button><Button variant="ghost" size="sm" onClick={() => openEdit(report)}><IconPencil className="size-4" />Edit</Button><Button variant="ghost" size="sm" className="text-red-600 hover:bg-red-50 hover:text-red-700" onClick={() => setPendingDelete(report)}><IconTrash className="size-4" />Delete</Button></div></div></CardContent></Card>;
         })}
       </div>
 
@@ -158,7 +163,7 @@ export function SitesView() {
           <div><Label>Title</Label><Input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Brief summary" /></div>
           <div className="grid gap-4 sm:grid-cols-2"><div><Label>Project</Label><Select value={form.projectId} onChange={(e) => setForm({ ...form, projectId: e.target.value })}><option value="">Select project</option>{projects.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></div><div><Label>Status</Label><Select value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as SiteReport["status"] })}><option value="open">Open</option><option value="resolved">Resolved</option></Select></div></div>
           <div><Label>Description</Label><Textarea required value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Detailed description of the update or issue..." /></div>
-          <div><Label>Attachments</Label><div className="flex gap-2"><Input value={attachInput} onChange={(e) => setAttachInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addAttachment(); } }} placeholder="Filename or URL" /><Button type="button" variant="outline" onClick={addAttachment} aria-label="Add attachment"><IconPaperclip className="size-4" /></Button></div>{form.attachments.length > 0 && <div className="mt-2 space-y-1">{form.attachments.map((a, i) => <div key={`${a}-${i}`} className="flex items-center gap-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600"><IconFileDescription className="size-3.5" /><span className="min-w-0 flex-1 truncate">{a}</span><button type="button" aria-label={`Remove ${a}`} onClick={() => removeAttachment(i)} className="rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-red-600"><IconX className="size-3.5" /></button></div>)}</div>}</div>
+          <div><Label>Attachments</Label><label className="flex h-11 cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 text-sm font-medium text-slate-600 transition-colors hover:border-orange-300 hover:bg-orange-50 hover:text-orange-700"><IconPaperclip className="size-4" />Choose files from your device<input type="file" multiple className="sr-only" onChange={(e) => { addAttachments(e.target.files); e.target.value = ""; }} /></label><p className="mt-1 text-xs text-slate-400">You can select multiple files.</p>{form.attachments.length > 0 && <div className="mt-2 space-y-1">{form.attachments.map((a, i) => <div key={`${a}-${i}`} className="flex items-center gap-2 rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600"><IconFileDescription className="size-3.5" /><span className="min-w-0 flex-1 truncate">{a}</span><button type="button" aria-label={`Remove ${a}`} onClick={() => removeAttachment(i)} className="rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-red-600"><IconX className="size-3.5" /></button></div>)}</div>}</div>
           {formError && <p className="text-sm font-medium text-red-600">{formError}</p>}
           <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setEditorOpen(false)}>Cancel</Button><Button type="submit">{editing ? "Save changes" : "Create report"}</Button></div>
         </form>
@@ -166,6 +171,10 @@ export function SitesView() {
 
       <Dialog open={Boolean(detail)} onOpenChange={(open) => { if (!open) setDetail(null); }} title={detail?.title ?? "Report details"} description={detail ? `${projectNames[detail.projectId] ?? "Unknown project"} · ${detail.createdAt}` : undefined}>
         {detail && <div className="space-y-5"><div className="flex flex-wrap gap-2"><Badge>{detail.type}</Badge><Badge value={detail.status} /></div><p className="text-sm leading-6 text-slate-600">{detail.description}</p>{detail.attachments.length > 0 && <div><Label>Attachments</Label><div className="space-y-2">{detail.attachments.map((a, i) => <div key={`${a}-${i}`} className="flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 px-3 py-2 text-sm text-slate-600"><IconPhoto className="size-4 text-orange-500" /><span className="min-w-0 flex-1 truncate">{a}</span></div>)}</div></div>}<div className="flex flex-wrap justify-end gap-2"><Button variant="outline" onClick={() => setDetail(null)}>Close</Button><Button variant="secondary" onClick={() => openEdit(detail)}><IconPencil className="size-4" />Edit</Button></div></div>}
+      </Dialog>
+
+      <Dialog open={Boolean(pendingDelete)} onOpenChange={(open) => { if (!open) setPendingDelete(null); }} title="Delete report" description="Are you sure you want to delete this report? This action cannot be undone.">
+        {pendingDelete && <div className="space-y-4"><p className="text-sm font-medium text-slate-900">{pendingDelete.title}</p><div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setPendingDelete(null)}>Cancel</Button><Button onClick={() => { deleteReport(pendingDelete.id); setPendingDelete(null); }}>Delete</Button></div></div>}
       </Dialog>
     </>
   );

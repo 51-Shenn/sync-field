@@ -408,7 +408,7 @@ export function MultiSelect({
           <div
             ref={menuRef}
             role="listbox"
-            className="z-50 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
+            className="z-[100] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
             style={{
               position: "fixed",
               top: coords.top,
@@ -484,13 +484,6 @@ export function Select({
   onChange,
   ...props
 }: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
-  const [internalValue, setInternalValue] = useState(defaultValue ?? "");
-
   const options = useMemo(
     () =>
       React.Children.toArray(children).filter(
@@ -502,117 +495,44 @@ export function Select({
       ),
     [children],
   );
-  const activeValue = value ?? internalValue;
-  const label = useMemo(
-    () => options.find((o) => o.props.value === activeValue)?.props.children ?? activeValue,
-    [options, activeValue],
-  );
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node) && !menuRef.current?.contains(e.target as Node))
-        setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open || !buttonRef.current) return;
-    const rect = buttonRef.current.getBoundingClientRect();
-    setCoords({ top: rect.bottom + 6, left: rect.left, width: rect.width });
-  }, [open]);
-
+  const placeholder = options.find((option) => String(option.props.value ?? option.props.children) === "")?.props.children;
+  const controlledValue = value === undefined ? undefined : String(value);
+  const initialValue = defaultValue === undefined ? undefined : String(defaultValue);
   return (
-    <div ref={ref} className="relative">
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={() => setOpen(!open)}
+    <SelectPrimitive.Root
+      value={controlledValue}
+      defaultValue={initialValue}
+      name={props.name}
+      disabled={props.disabled}
+      required={props.required}
+      onValueChange={(newValue) => {
+        const target = { value: newValue } as HTMLSelectElement;
+        onChange?.({ target, currentTarget: target } as React.ChangeEvent<HTMLSelectElement>);
+      }}
+    >
+      <SelectPrimitive.Trigger
+        id={props.id}
+        aria-label={props["aria-label"]}
         className={cn(
-          "relative flex h-10 w-full items-center rounded-xl border border-slate-200 bg-white px-3 pr-10 text-left text-sm text-slate-700 outline-none transition-shadow duration-150 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 hover:shadow-sm",
+          "flex h-10 w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 text-left text-sm text-slate-700 outline-none transition-shadow hover:shadow-sm focus:border-orange-400 focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:opacity-50",
           className,
         )}
-        id={props.id}
-        name={props.name}
-        disabled={props.disabled}
-        aria-label={props["aria-label"]}
-        aria-haspopup="listbox"
-        aria-expanded={open}
       >
-        <span className="flex-1 truncate">{label}</span>
-        <svg
-          className="absolute right-3 size-4 shrink-0 text-slate-400 transition-transform duration-200"
-          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
-      </button>
-      {open &&
-        createPortal(
-          <div
-            ref={menuRef}
-            role="listbox"
-            className="z-50 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
-            style={{
-              position: "fixed",
-              top: coords.top,
-              left: coords.left,
-              width: coords.width,
-              animation: "fade-in 0.12s ease-out",
-            }}
-          >
-            {options.map((opt) => {
-              const optValue = opt.props.value ?? String(opt.props.children);
-              const isSelected = opt.props.value === activeValue;
-              return (
-                <button
-                  key={String(optValue)}
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  className={cn(
-                    "flex w-full items-center px-3 py-2.5 text-left text-sm transition-colors duration-100 hover:bg-slate-50",
-                    isSelected
-                      ? "bg-orange-50 font-medium text-orange-700"
-                      : "text-slate-600",
-                  )}
-                  onClick={() => {
-                    const newVal = opt.props.value ?? String(opt.props.children);
-                    if (value === undefined) setInternalValue(newVal);
-                    const target = { value: newVal } as HTMLSelectElement;
-                    onChange?.({ target, currentTarget: target } as React.ChangeEvent<HTMLSelectElement>);
-                    setOpen(false);
-                  }}
-                >
-                  <span className="flex-1">{opt.props.children}</span>
-                  {isSelected && (
-                    <svg
-                      className="size-4 shrink-0 text-orange-500"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M20 6 9 17l-5-5" />
-                    </svg>
-                  )}
-                </button>
-              );
+        <SelectPrimitive.Value placeholder={placeholder} />
+        <SelectPrimitive.Icon asChild><IconChevronDown className="size-4 shrink-0 text-slate-400" /></SelectPrimitive.Icon>
+      </SelectPrimitive.Trigger>
+      <SelectPrimitive.Portal>
+        <SelectPrimitive.Content position="popper" sideOffset={6} className="z-[100] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+          <SelectPrimitive.Viewport className="p-1">
+            {options.map((option) => {
+              const optionValue = String(option.props.value ?? option.props.children);
+              if (!optionValue) return null;
+              return <SelectPrimitive.Item key={optionValue} value={optionValue} disabled={option.props.disabled} className="relative flex cursor-default select-none items-center rounded-lg py-2.5 pl-3 pr-9 text-sm text-slate-600 outline-none data-[highlighted]:bg-slate-50 data-[state=checked]:bg-orange-50 data-[state=checked]:font-medium data-[state=checked]:text-orange-700 data-[disabled]:pointer-events-none data-[disabled]:opacity-50"><SelectPrimitive.ItemText>{option.props.children}</SelectPrimitive.ItemText><SelectPrimitive.ItemIndicator className="absolute right-3"><IconCheck className="size-4 text-orange-500" /></SelectPrimitive.ItemIndicator></SelectPrimitive.Item>;
             })}
-          </div>,
-          document.body,
-        )}
-    </div>
+          </SelectPrimitive.Viewport>
+        </SelectPrimitive.Content>
+      </SelectPrimitive.Portal>
+    </SelectPrimitive.Root>
   );
 }
 
