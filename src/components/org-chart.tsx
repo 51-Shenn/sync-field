@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useCallback } from "react";
 import { OrgChart as D3OrgChart } from "d3-org-chart";
-import { Maximize2, Minus, Plus } from "lucide-react";
+import { IconMaximize, IconMinus, IconPlus } from "@tabler/icons-react";
 import { Button } from "@/components/ui";
 
 export interface OrgChartNode {
@@ -228,7 +228,7 @@ export function OrgChart({ data, onNodeClick, searchQuery }: OrgChartProps) {
           onClick={handleExpandAll}
           title="Expand all"
         >
-          <Plus className="size-3.5" />
+          <IconPlus className="size-3.5" />
           Expand all
         </Button>
         <Button
@@ -237,7 +237,7 @@ export function OrgChart({ data, onNodeClick, searchQuery }: OrgChartProps) {
           onClick={handleCollapseAll}
           title="Collapse all"
         >
-          <Minus className="size-3.5" />
+          <IconMinus className="size-3.5" />
           Collapse all
         </Button>
         <Button
@@ -246,7 +246,7 @@ export function OrgChart({ data, onNodeClick, searchQuery }: OrgChartProps) {
           onClick={handleFit}
           title="Fit to screen"
         >
-          <Maximize2 className="size-3.5" />
+          <IconMaximize className="size-3.5" />
           Fit
         </Button>
       </div>

@@ -5,7 +5,7 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import * as AvatarPrimitive from "@radix-ui/react-avatar";
-import { X } from "lucide-react";
+import { IconX } from "@tabler/icons-react";
 import { cn, initials } from "@/lib/utils";
 
 export function Button({ className, variant = "default", size = "default", ...props }: React.ButtonHTMLAttributes<HTMLButtonElement> & { variant?: "default" | "outline" | "ghost" | "secondary" | "danger"; size?: "default" | "sm" | "icon" }) {
@@ -47,9 +47,10 @@ export function MultiSelect({ options, selected, onChange, placeholder, classNam
   const label = selected.length === 0 ? (placeholder ?? "Select...") : selected.length === 1 ? (options.find(o => o.value === selected[0])?.label ?? selected[0]) : `${selected.length} selected`;
 
   return <div ref={ref} className="relative">
-    <button type="button" onClick={() => setOpen(!open)} className={cn("relative flex h-10 w-full min-w-[160px] items-center rounded-xl border border-slate-200 bg-white px-3 pr-10 text-left text-sm outline-none transition-shadow duration-150 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 hover:shadow-sm", selected.length > 0 ? "text-slate-700" : "text-slate-400", className)}>
+    <button type="button" onClick={() => setOpen(!open)} className={cn("relative flex h-10 w-full min-w-[160px] items-center gap-0.5 rounded-xl border border-slate-200 bg-white px-3 text-left text-sm outline-none transition-shadow duration-150 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 hover:shadow-sm", selected.length > 0 ? "text-slate-700" : "text-slate-400", className)}>
       <span className="flex-1 truncate">{label}</span>
-      <svg className="absolute right-3 size-4 shrink-0 text-slate-400 transition-transform duration-200" style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      {selected.length > 0 && <span role="button" tabIndex={0} onClick={e => { e.stopPropagation(); onChange([]); }} onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onChange([]); } }} className="flex cursor-pointer items-center justify-center rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"><IconX className="size-3.5" /></span>}
+      <svg className="size-4 shrink-0 text-slate-400 transition-transform duration-200" style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
     </button>
     {open && <div className="absolute z-50 mt-1.5 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg" style={{ animation: "fade-in 0.12s ease-out" }}>
       {options.map(opt => {
@@ -59,7 +60,6 @@ export function MultiSelect({ options, selected, onChange, placeholder, classNam
           <span className={cn("flex-1", isSelected ? "font-medium text-slate-900" : "text-slate-600")}>{opt.label}</span>
         </button>;
       })}
-      {selected.length > 0 && <button type="button" className="flex w-full items-center gap-3 border-t border-slate-100 px-3 py-2.5 text-left text-xs font-medium text-slate-500 transition-colors hover:bg-slate-50" onClick={() => onChange([])}>Clear all</button>}
     </div>}
   </div>;
 }
@@ -101,7 +101,7 @@ export function Separator({ className }: { className?: string }) { return <div c
 export function Skeleton({ className }: { className?: string }) { return <div className={cn("animate-pulse rounded-lg bg-slate-100", className)} />; }
 
 export function Dialog({ trigger, title, description, children, open, onOpenChange }: { trigger?: React.ReactNode; title: string; description?: string; children: React.ReactNode; open?: boolean; onOpenChange?: (open: boolean) => void }) {
-  return <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>{trigger ? <DialogPrimitive.Trigger asChild>{trigger}</DialogPrimitive.Trigger> : null}<DialogPrimitive.Portal><DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-[2px] data-[state=open]:animate-in" /><DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl outline-none"><DialogPrimitive.Title className="text-lg font-semibold text-slate-950">{title}</DialogPrimitive.Title>{description && <DialogPrimitive.Description className="mt-1 text-sm text-slate-500">{description}</DialogPrimitive.Description>}<div className="mt-5">{children}</div><DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><X className="size-4" /></DialogPrimitive.Close></DialogPrimitive.Content></DialogPrimitive.Portal></DialogPrimitive.Root>;
+  return <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>{trigger ? <DialogPrimitive.Trigger asChild>{trigger}</DialogPrimitive.Trigger> : null}<DialogPrimitive.Portal><DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-[2px] data-[state=open]:animate-in" /><DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl outline-none"><DialogPrimitive.Title className="text-lg font-semibold text-slate-950">{title}</DialogPrimitive.Title>{description && <DialogPrimitive.Description className="mt-1 text-sm text-slate-500">{description}</DialogPrimitive.Description>}<div className="mt-5">{children}</div><DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700"><IconX className="size-4" /></DialogPrimitive.Close></DialogPrimitive.Content></DialogPrimitive.Portal></DialogPrimitive.Root>;
 }
 
 export function Tabs({ tabs, defaultValue, className }: { tabs: { value: string; label: string; content: React.ReactNode }[]; defaultValue?: string; className?: string }) {

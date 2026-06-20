@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { CalendarClock, ClipboardCheck, HardHat, MoreHorizontal, TriangleAlert, Users } from "lucide-react";
+import { IconCalendarClock, IconClipboardCheck, IconHelmet, IconDots, IconAlertTriangle, IconUsers } from "@tabler/icons-react";
 import { activities, auditLogs as initialLogs, projects, siteReports, tasks, teamMembers } from "@/lib/mock-data";
 import { Avatar, Badge, Button, Card, CardContent, Progress } from "@/components/ui";
 import { StatCard } from "@/components/page-elements";
@@ -21,14 +21,14 @@ export function ControlCentreView() {
         <h2 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Good morning, Marcus</h2>
         <p className="mt-1 max-w-2xl text-sm text-slate-500">Here&apos;s what&apos;s happening across your jobsites today.</p>
       </div>
-      <Button><ClipboardCheck className="size-4" />Create report</Button>
+      <Button><IconClipboardCheck className="size-4" />Create report</Button>
     </div>
 
     <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <StatCard label="Active projects" value={String(activeProjects)} trend="+1 this month" icon={<HardHat className="size-5" />} />
-      <StatCard label="Tasks due this week" value={String(pendingTasks)} trend="6 completed" icon={<CalendarClock className="size-5" />} accent="blue" />
-      <StatCard label="Open issues" value={String(openIssues)} trend={openIssues > 0 ? "needs attention" : "all clear"} icon={<TriangleAlert className="size-5" />} accent={openIssues > 0 ? "violet" : "emerald"} />
-      <StatCard label="Crew on site" value={String(totalCrew)} trend="active today" icon={<Users className="size-5" />} accent="emerald" />
+      <StatCard label="Active projects" value={String(activeProjects)} trend="+1 this month" icon={<IconHelmet className="size-5" />} />
+      <StatCard label="Tasks due this week" value={String(pendingTasks)} trend="6 completed" icon={<IconCalendarClock className="size-5" />} accent="blue" />
+      <StatCard label="Open issues" value={String(openIssues)} trend={openIssues > 0 ? "needs attention" : "all clear"} icon={<IconAlertTriangle className="size-5" />} accent={openIssues > 0 ? "violet" : "emerald"} />
+      <StatCard label="Crew on site" value={String(totalCrew)} trend="active today" icon={<IconUsers className="size-5" />} accent="emerald" />
     </section>
 
     <section className="mt-6 grid gap-6 xl:grid-cols-[1.5fr_1fr]">
@@ -55,7 +55,7 @@ export function ControlCentreView() {
                 </div>
                 <Progress value={project.progress} />
               </div>
-              <Button variant="ghost" size="icon" className="hidden sm:flex"><MoreHorizontal className="size-4" /></Button>
+              <Button variant="ghost" size="icon" className="hidden sm:flex"><IconDots className="size-4" /></Button>
             </div>
           ))}
         </CardContent>
