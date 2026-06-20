@@ -65,9 +65,8 @@ def main():
     print(f"VRP: insufficient inventory reason string correct:   {'PASS' if p1_inv['pass'] else 'FAIL'}")
     print(f"VRP: shift overrun + boundary correctly handled:     {'PASS' if p1_shift['pass'] else 'FAIL'}")
     print("--- P2 (documenting known gaps, not pass/fail) ---")
-    print(f"2-node cycle does NOT hang construction:             {'OK' if not p2_cycle['hung'] else 'HANGS'}")
-    print(f"Cycles deadlock SILENTLY (no detection):             confirmed gap")
-    print(f"Re-reporting failure on a FAILED task raises:        {'CONFIRMED' if p2_failed['crashed'] else 'no-ops'}")
+    print(f"2-node cycle correctly rejected at construction:   {'PASS' if p2_cycle['rejected'] else 'GAP'}")
+    print(f"FAILED re-report no-ops with ALREADY_FAILED:       {'PASS' if p2_failed['guarded'] else 'GAP'}")
 
     failed = (
         bool(parser_result["crashes"]) or not cache_ok or sim_result["bug_reproduced"]
@@ -75,7 +74,7 @@ def main():
         or not p0_policy["retries_ok"] or not p0_policy_role["role_ok"]
         or not p1_window["pass"] or not p1_delay["pass"] or not p1_eta["pass"]
         or not p1_skill["pass"] or not p1_inv["pass"] or not p1_shift["pass"]
-        or p2_cycle["hung"]
+        or not p2_cycle["rejected"] or not p2_failed["guarded"]
     )
 
     if failed:

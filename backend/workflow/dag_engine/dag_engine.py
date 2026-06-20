@@ -131,7 +131,30 @@ class SyncFieldDAG:
                 if dep in self.children_map:
                     self.children_map[dep].append(t_id)
 
+        self._detect_cycles()
+
         self.evaluate_graph()
+
+    def _detect_cycles(self) -> None:
+        visited: set = set()
+        rec_stack: set = set()
+
+        def dfs(node: str) -> bool:
+            visited.add(node)
+            rec_stack.add(node)
+            for child in self.children_map.get(node, []):
+                if child not in visited:
+                    if dfs(child):
+                        return True
+                elif child in rec_stack:
+                    return True
+            rec_stack.discard(node)
+            return False
+
+        for t_id in self.tasks:
+            if t_id not in visited:
+                if dfs(t_id):
+                    raise ValueError(f"Cycle detected in DAG — construction aborted")
 
     def get_descendants(self, start_node_id: str) -> Set[str]:
         """Traverses downstream nodes using BFS to find all affected children."""
@@ -521,6 +544,14 @@ class FieldOpsDomainRules:
 
     def handle_task_failure(self, engine: SyncFieldDAG, task_id: str, failure_type: str, technician_id: str) -> dict:
         task = engine.tasks[task_id]
+
+        if task["state"] == "FAILED":
+            return {
+                "action": "ALREADY_FAILED",
+                "assignee": technician_id,
+                "msg": f"Task {task_id} is already FAILED — ignoring late failure report."
+            }
+
         category = self.find_failure_category(failure_type)
         policy = self.policies.get(category)
         if not policy:
