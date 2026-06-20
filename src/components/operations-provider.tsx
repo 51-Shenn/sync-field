@@ -84,8 +84,8 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
 
   const mutate = useCallback(async (url: string, method: string, body?: Record<string, unknown>) => {
     await requestJson(url, { method, body: body ? JSON.stringify(body) : undefined });
-    // Realtime CDC will trigger refresh when the DB change propagates.
-  }, []);
+    await refresh();
+  }, [refresh]);
 
   const issueCommand = useCallback(async (command: OperationsCommandInput) => {
     const requestedState = command.payload?.state;
