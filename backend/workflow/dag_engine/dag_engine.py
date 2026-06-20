@@ -65,9 +65,12 @@ class TechnicianSchedule:
         for w in self.windows:
             if w.start >= when:
                 new_windows.append(AvailabilityWindow(w.start + by, w.end + by, w.source, confirmed))
+            elif w.start < when < w.end:
+                new_windows.append(AvailabilityWindow(w.start, when, w.source, w.confirmed))
+                new_windows.append(AvailabilityWindow(when + by, w.end + by, w.source, confirmed))
             else:
                 new_windows.append(w)
-        self.windows = new_windows
+        self.windows = sorted(new_windows, key=lambda w: w.start)
 
 # Define the explicit physical-world state space
 VALID_STATES = {
@@ -84,7 +87,7 @@ VALID_STATES = {
 VALID_MANUAL_TRANSITIONS = {
     "LOCKED":    {"READY"},
     "READY":     {"ACTIVE", "LOCKED"},
-    "ACTIVE":    {"COMPLETE", "BLOCKED", "FAILED"},
+    "ACTIVE":    {"COMPLETE", "BLOCKED", "FAILED", "READY"},
     "BLOCKED":   {"ACTIVE", "FAILED"},
     "COMPLETE":  {"REGRESSED"},
     "REGRESSED": {"ACTIVE"},
@@ -214,7 +217,7 @@ class SyncFieldDAG:
         for t_id in order:
             task = self.tasks[t_id]
             deps = task.get("dependencies", [])
-            duration = timedelta(hours=task.get("estimated_duration_hours", 2))
+            duration = timedelta(hours=task.get("estimated_duration_hours") or 2)
 
             if t_id == blocked_task_id:
                 if task.get("resolution_eta"):
@@ -242,7 +245,7 @@ class SyncFieldDAG:
                 if dep_task["state"] == "COMPLETE":
                     upstream_etas.append(("EXACT", datetime.min))
                 elif dep_task.get("resolution_eta"):
-                    dep_duration = dep_task.get("estimated_duration_hours", 2)
+                    dep_duration = dep_task.get("estimated_duration_hours") or 2
                     dep_finish = dep_task["resolution_eta"] + timedelta(hours=dep_duration)
                     upstream_etas.append((
                         dep_task.get("eta_confidence", "ESTIMATED"),
@@ -430,7 +433,7 @@ class SyncFieldDAG:
         # Factor 2: Time pressure / Deadline proximity
         deadline_score = 0.0
         days_left = None
-        if "deadline" in task:
+        if task.get("deadline") is not None:
             days_left = (task["deadline"] - datetime.now()).total_seconds() / 86400.0
             deadline_score = max(0.0, (7.0 - days_left) * 5.0)
             score += deadline_score
@@ -463,7 +466,7 @@ class SyncFieldDAG:
         if category:
             data_sources.append("failure_category")
 
-        granularity = "DETAILED" if "deadline" in task and "estimated_duration_hours" in task else "ESTIMATE"
+        granularity = "DETAILED" if task.get("deadline") is not None and task.get("estimated_duration_hours") is not None else "ESTIMATE"
 
         return TaskPriority(
             task_id=task_id,
@@ -499,6 +502,7 @@ class SyncFieldDAG:
             earliest = task.get("earliest_start")
             task_upserts.append({
                 "id": task_id,
+                "task_name": task.get("task_name"),
                 "state": event["new_state"],
                 "failure_category": task.get("failure_category"),
                 "attempt_count": task.get("attempt_count", 0),
@@ -517,7 +521,16 @@ class SyncFieldDAG:
         } for e in events]
 
         if task_upserts:
-            sb_client.table("tasks").upsert(task_upserts).execute()
+            try:
+                sb_client.table("tasks").upsert(task_upserts).execute()
+            except Exception:
+                stripped = []
+                for row in task_upserts:
+                    stripped.append({k: v for k, v in row.items()
+                                     if k in ("id", "task_name", "state",
+                                              "failure_category",
+                                              "attempt_count", "updated_at")})
+                sb_client.table("tasks").upsert(stripped).execute()
         if event_inserts:
             sb_client.table("task_events").insert(event_inserts).execute()
 
@@ -562,19 +575,21 @@ class FieldOpsDomainRules:
         attempt = task["attempt_count"]
 
         if attempt <= policy.max_local_retries:
-            engine.update_task_state(task_id, "BLOCKED", f"Local retry {attempt}/{policy.max_local_retries} for {failure_type}")
+            events = engine.update_task_state(task_id, "BLOCKED", f"Local retry {attempt}/{policy.max_local_retries} for {failure_type}")
             return {
                 "action": "RETRY_LOCAL",
                 "assignee": technician_id,
-                "msg": f"Technical issue ({failure_type}). Retrying task locally. Attempt {attempt}/{policy.max_local_retries}."
+                "msg": f"Technical issue ({failure_type}). Retrying task locally. Attempt {attempt}/{policy.max_local_retries}.",
+                "_events": events,
             }
         else:
-            engine.update_task_state(task_id, "BLOCKED", f"Escalated to {policy.escalate_to_role} due to {failure_type}")
+            events = engine.update_task_state(task_id, "BLOCKED", f"Escalated to {policy.escalate_to_role} due to {failure_type}")
             affected_techs = engine.get_affected_technicians(task_id)
             return {
                 "action": "ESCALATE",
                 "assigned_to": technician_id,
                 "escalate_to_role": policy.escalate_to_role,
                 "affected_technicians": affected_techs,
-                "msg": f"Escalated {failure_type} to {policy.escalate_to_role}. Blocked downstream path contains {len(affected_techs)} staff."
+                "msg": f"Escalated {failure_type} to {policy.escalate_to_role}. Blocked downstream path contains {len(affected_techs)} staff.",
+                "_events": events,
             }

@@ -3,8 +3,8 @@ import os
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from llm.analysis_prompt import SYSTEM_PROMPT
-from llm.validators import validate_output
+from backend.llm.analysis_prompt import SYSTEM_PROMPT
+from backend.llm.validators import validate_output
 
 load_dotenv()
 client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])

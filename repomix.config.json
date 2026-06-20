@@ -1,9 +1,9 @@
 {
   "output": {
-    "filePath": "repomix-output.xml",
+    "filePath": "repomix-output-backend.xml",
     "style": "xml",
     "parsableStyle": true,
-    "headerText": "Imagine-Hack — Field Operations DAG Engine + Next.js Frontend",
+    "headerText": "Imagine-Hack — Field Operations DAG Engine (Backend Only)",
     "instructionFilePath": "AGENTS.md",
     "removeComments": false,
     "removeEmptyLines": false,
@@ -11,20 +11,14 @@
     "showLineNumbers": true
   },
   "include": [
-    "**/*.py",
-    "**/*.ts",
-    "**/*.tsx",
-    "**/*.sql",
-    "**/*.json",
-    "**/*.mjs",
-    "**/*.css",
-    "**/*.prisma",
-    "**/*.toml"
+    "backend/**/*.py",
+    "backend/**/*.sql",
+    "backend/**/*.json"
   ],
   "ignore": {
     "useGitignore": true,
     "customPatterns": [
-      "repomix-output.xml",
+      "repomix-output*.xml",
       "package-lock.json",
       ".venv/",
       "__pycache__/",

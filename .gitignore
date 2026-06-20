@@ -53,5 +53,5 @@ venv/
 downloads/
 
 # repomix
-repomix-output.*
+repomix-output*
 repomix-changes.*

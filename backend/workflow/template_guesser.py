@@ -158,3 +158,48 @@ class TemplateGuesser:
             )
 
         return instantiated
+
+    def save_template(self, name: str, description: str, guesses: Dict[str, GuessedTask]) -> dict:
+        serialized_tasks = []
+        for task_name, g_task in guesses.items():
+            serialized_tasks.append({
+                "task_name": task_name,
+                "suggested_dependencies": [
+                    {
+                        "parent_name": dep.parent_name,
+                        "confidence": dep.confidence,
+                        "evidence": dep.evidence,
+                    }
+                    for dep in g_task.suggested_dependencies
+                ],
+                "guessed": g_task.guessed,
+            })
+
+        payload = {
+            "name": name,
+            "description": description,
+            "tasks": serialized_tasks,
+            "updated_at": "now()",
+        }
+
+        res = self.sb.table("project_templates").upsert(payload).execute()
+        return res.data[0] if res.data else {}
+
+    def load_template(self, name: str) -> Dict[str, GuessedTask]:
+        res = self.sb.table("project_templates").select("tasks").eq("name", name).maybe_single().execute()
+        if not res or not res.data:
+            raise ValueError(f"Project template '{name}' not found.")
+
+        raw_tasks = res.data.get("tasks", [])
+        guesses: Dict[str, GuessedTask] = {}
+        for t in raw_tasks:
+            task_name = t["task_name"]
+            guesses[task_name] = GuessedTask(
+                task_name=task_name,
+                suggested_dependencies=[
+                    GuessedDependency(**dep)
+                    for dep in t.get("suggested_dependencies", [])
+                ],
+                guessed=t.get("guessed", False),
+            )
+        return guesses

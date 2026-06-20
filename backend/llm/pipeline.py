@@ -1,7 +1,14 @@
-from integrations.supabase.client import get_supabase_client
-from llm.analyzer import llm_analyze
+from backend.integrations.supabase.client import get_supabase_client
+from backend.llm.analyzer import llm_analyze
 
 CONFIDENCE_MAP = {"high": 1.0, "low": 0.5}
+
+_dispatcher = None
+
+
+def set_dispatcher(dispatcher) -> None:
+    global _dispatcher
+    _dispatcher = dispatcher
 
 
 def get_valid_tasks(sb) -> list[str]:
@@ -36,7 +43,7 @@ def save_original_message(sb, message: dict, telegram_id=None) -> str:
     return inserted.data[0]["id"]
 
 
-def process_message(message: dict, telegram_id=None) -> dict | None:
+def process_message(message: dict, telegram_id=None, dispatcher=None) -> dict | None:
     sb = get_supabase_client()
     original_message_id = save_original_message(sb, message, telegram_id)
 
@@ -57,5 +64,22 @@ def process_message(message: dict, telegram_id=None) -> dict | None:
         "note": result.get("note"),
         "tier_resolved": "llm",
     }).execute()
+
+    task_id = resolve_task_id(sb, result.get("task_name"))
+    confidence = CONFIDENCE_MAP.get(result.get("confidence"), 0.5)
+
+    if task_id and confidence == 1.0 and (dispatcher or _dispatcher):
+        label = result.get("label")
+        status = result.get("status")
+        technician_id = resolve_technician_id(sb, telegram_id) or "llm"
+        d = dispatcher or _dispatcher
+
+        if label == "task_completion" and status == "done":
+            d.process_completion_report(task_id, technician_id)
+        elif label == "issue_report" or status == "blocked":
+            failure_type = result.get("note") or "SITE_NOT_READY"
+            d.process_failure_report(task_id, failure_type, technician_id)
+        elif label == "task_start" and status == "in_progress":
+            d.process_start_report(task_id, technician_id)
 
     return result
