@@ -1,7 +1,7 @@
 export type ProjectStatus = "planning" | "in_progress" | "on_hold" | "completed";
 export type Project = {
   id: string; name: string; client: string; location: string; status: ProjectStatus;
-  progress: number; budget: number; spent: number; startDate: string; endDate: string;
+  progress: number; startDate: string; endDate: string;
   managerId: string; teamIds: string[]; color: string; description: string;
 };
 export type Task = {
@@ -15,6 +15,19 @@ export type TeamMember = {
 export type DocumentFile = {
   id: string; name: string; type: "pdf" | "image" | "doc" | "spreadsheet";
   projectId: string; uploadedBy: string; uploadedAt: string; sizeKb: number;
+};
+export type Subtask = {
+  id: string; taskId: string; title: string; status: "todo" | "done";
+  assigneeId: string; dueDate: string;
+};
+export type SiteReport = {
+  id: string; projectId: string; title: string; type: "update" | "issue";
+  description: string; status: "open" | "resolved"; createdBy: string;
+  createdAt: string; attachments: string[];
+};
+export type AuditLog = {
+  id: string; action: "created" | "updated" | "deleted"; entity: string;
+  entityId: string; entityName: string; performedBy: string; timestamp: string; details: string;
 };
 
 export const teamMembers: TeamMember[] = [
@@ -31,13 +44,13 @@ export const teamMembers: TeamMember[] = [
 ];
 
 export const projects: Project[] = [
-  { id: "riverside", name: "Riverside Tower", client: "Axis Development", location: "Oakland, CA", status: "in_progress", progress: 68, budget: 12400000, spent: 7860000, startDate: "Jan 15, 2025", endDate: "Oct 30, 2026", managerId: "tm2", teamIds: ["tm1","tm2","tm5","tm6","tm8","tm10"], color: "#f97316", description: "A 22-story mixed-use tower with 184 residential units, ground-floor retail, and two levels of underground parking." },
-  { id: "oakwood", name: "Oakwood Residences", client: "Northline Living", location: "San Jose, CA", status: "in_progress", progress: 42, budget: 8200000, spent: 3440000, startDate: "Mar 03, 2025", endDate: "Feb 18, 2027", managerId: "tm1", teamIds: ["tm1","tm4","tm6","tm9","tm10"], color: "#2563eb", description: "A sustainable residential community of six buildings centered on landscaped communal courtyards." },
-  { id: "harbor", name: "Harbor Point Offices", client: "Beacon Properties", location: "San Francisco, CA", status: "on_hold", progress: 31, budget: 9600000, spent: 3120000, startDate: "Feb 10, 2025", endDate: "Dec 12, 2026", managerId: "tm3", teamIds: ["tm3","tm5","tm7","tm10"], color: "#8b5cf6", description: "A flexible waterfront office campus designed for hybrid teams and high environmental performance." },
-  { id: "metro", name: "Metro Transit Hub", client: "Bay Transit Authority", location: "Berkeley, CA", status: "planning", progress: 14, budget: 15800000, spent: 1380000, startDate: "Aug 20, 2025", endDate: "May 06, 2028", managerId: "tm3", teamIds: ["tm3","tm6","tm9"], color: "#14b8a6", description: "Transit interchange modernization with expanded platforms, retail concourse, and improved accessibility." },
-  { id: "crestline", name: "Crestline Medical Center", client: "Pacifica Health", location: "Palo Alto, CA", status: "in_progress", progress: 83, budget: 18700000, spent: 15320000, startDate: "Sep 12, 2024", endDate: "Aug 22, 2026", managerId: "tm4", teamIds: ["tm4","tm7"], color: "#ef4444", description: "A technically advanced outpatient medical center with imaging, surgical, and rehabilitation suites." },
-  { id: "summit", name: "Summit School Expansion", client: "Summit Unified", location: "Walnut Creek, CA", status: "completed", progress: 100, budget: 4100000, spent: 3980000, startDate: "Jun 01, 2024", endDate: "May 28, 2026", managerId: "tm8", teamIds: ["tm8","tm2"], color: "#22c55e", description: "A new science wing and gymnasium for a growing K-12 campus." },
-  { id: "market", name: "Market Street Retrofit", client: "Kinetic Retail", location: "San Francisco, CA", status: "planning", progress: 9, budget: 2800000, spent: 184000, startDate: "Jul 08, 2026", endDate: "Apr 19, 2027", managerId: "tm2", teamIds: ["tm2","tm5","tm7"], color: "#eab308", description: "Seismic retrofit and tenant improvements for a landmark urban retail property." },
+  { id: "riverside", name: "Riverside Tower", client: "Axis Development", location: "Oakland, CA", status: "in_progress", progress: 68, startDate: "Jan 15, 2025", endDate: "Oct 30, 2026", managerId: "tm2", teamIds: ["tm1","tm2","tm5","tm6","tm8","tm10"], color: "#f97316", description: "A 22-story mixed-use tower with 184 residential units, ground-floor retail, and two levels of underground parking." },
+  { id: "oakwood", name: "Oakwood Residences", client: "Northline Living", location: "San Jose, CA", status: "in_progress", progress: 42, startDate: "Mar 03, 2025", endDate: "Feb 18, 2027", managerId: "tm1", teamIds: ["tm1","tm4","tm6","tm9","tm10"], color: "#2563eb", description: "A sustainable residential community of six buildings centered on landscaped communal courtyards." },
+  { id: "harbor", name: "Harbor Point Offices", client: "Beacon Properties", location: "San Francisco, CA", status: "on_hold", progress: 31, startDate: "Feb 10, 2025", endDate: "Dec 12, 2026", managerId: "tm3", teamIds: ["tm3","tm5","tm7","tm10"], color: "#8b5cf6", description: "A flexible waterfront office campus designed for hybrid teams and high environmental performance." },
+  { id: "metro", name: "Metro Transit Hub", client: "Bay Transit Authority", location: "Berkeley, CA", status: "planning", progress: 14, startDate: "Aug 20, 2025", endDate: "May 06, 2028", managerId: "tm3", teamIds: ["tm3","tm6","tm9"], color: "#14b8a6", description: "Transit interchange modernization with expanded platforms, retail concourse, and improved accessibility." },
+  { id: "crestline", name: "Crestline Medical Center", client: "Pacifica Health", location: "Palo Alto, CA", status: "in_progress", progress: 83, startDate: "Sep 12, 2024", endDate: "Aug 22, 2026", managerId: "tm4", teamIds: ["tm4","tm7"], color: "#ef4444", description: "A technically advanced outpatient medical center with imaging, surgical, and rehabilitation suites." },
+  { id: "summit", name: "Summit School Expansion", client: "Summit Unified", location: "Walnut Creek, CA", status: "completed", progress: 100, startDate: "Jun 01, 2024", endDate: "May 28, 2026", managerId: "tm8", teamIds: ["tm8","tm2"], color: "#22c55e", description: "A new science wing and gymnasium for a growing K-12 campus." },
+  { id: "market", name: "Market Street Retrofit", client: "Kinetic Retail", location: "San Francisco, CA", status: "planning", progress: 9, startDate: "Jul 08, 2026", endDate: "Apr 19, 2027", managerId: "tm2", teamIds: ["tm2","tm5","tm7"], color: "#eab308", description: "Seismic retrofit and tenant improvements for a landmark urban retail property." },
 ];
 
 export const tasks: Task[] = [
@@ -78,10 +91,19 @@ export const documents: DocumentFile[] = [
   { id:"d14", name:"Existing Conditions Photos.zip", type:"image", projectId:"market", uploadedBy:"tm2", uploadedAt:"Jun 20, 2026", sizeKb:31500 },
 ];
 
-export const budgetTrend = [
-  { month:"Jan", budgeted:4.2, spent:3.6 }, { month:"Feb", budgeted:5.0, spent:4.4 },
-  { month:"Mar", budgeted:5.4, spent:5.1 }, { month:"Apr", budgeted:6.1, spent:5.6 },
-  { month:"May", budgeted:6.8, spent:6.2 }, { month:"Jun", budgeted:7.4, spent:6.9 },
+export const subtasks: Subtask[] = [
+  { id:"st1", taskId:"t1", title:"Mobilize pump crew", status:"done", assigneeId:"tm8", dueDate:"Jun 22" },
+  { id:"st2", taskId:"t1", title:"Test slump", status:"done", assigneeId:"tm8", dueDate:"Jun 22" },
+  { id:"st3", taskId:"t1", title:"Finish screed", status:"todo", assigneeId:"tm8", dueDate:"Jun 23" },
+  { id:"st4", taskId:"t2", title:"Check elevations", status:"todo", assigneeId:"tm2", dueDate:"Jun 23" },
+  { id:"st5", taskId:"t2", title:"Verify anchor embedment", status:"todo", assigneeId:"tm7", dueDate:"Jun 24" },
+];
+
+export const siteReports: SiteReport[] = [
+  { id:"sr1", projectId:"riverside", title:"Level 14 rebar issue", type:"issue", description:"Some rebar splices are out of tolerance as per ACI 318.", status:"open", createdBy:"tm2", createdAt:"Jun 19, 2026", attachments:["rebar_photo_01.jpg"] },
+  { id:"sr2", projectId:"riverside", title:"Weekly progress update", type:"update", description:"Concrete pour complete. Plumbing rough-in on schedule.", status:"resolved", createdBy:"tm8", createdAt:"Jun 18, 2026", attachments:["progress_report_w24.pdf"] },
+  { id:"sr3", projectId:"oakwood", title:"Building C foundation pour", type:"update", description:"Foundation pour completed successfully.", status:"resolved", createdBy:"tm1", createdAt:"Jun 17, 2026", attachments:["cylinder_break_report.pdf"] },
+  { id:"sr4", projectId:"harbor", title:"Coastal permit non-conformance", type:"issue", description:"Erosion control measures not per approved plan.", status:"open", createdBy:"tm3", createdAt:"Jun 20, 2026", attachments:["erosion_control_photo.jpg","ncr_001.pdf"] },
 ];
 
 export const activities = [
@@ -92,11 +114,13 @@ export const activities = [
   { person:"Sofia", action:"closed 3 punch items at", target:"Summit School", time:"Yesterday" },
 ];
 
-export const costItems = [
-  { category:"General conditions", budgeted:980000, actual:824000 },
-  { category:"Concrete", budgeted:2180000, actual:2254000 },
-  { category:"Structural steel", budgeted:1940000, actual:1812000 },
-  { category:"Building envelope", budgeted:1620000, actual:1420000 },
-  { category:"Mechanical / Electrical", budgeted:2810000, actual:1260000 },
-  { category:"Interiors", budgeted:1780000, actual:290000 },
+export const auditLogs: AuditLog[] = [
+  { id:"al1", action:"created", entity:"project", entityId:"riverside", entityName:"Riverside Tower", performedBy:"Marcus Chen", timestamp:"Jun 15, 2026 09:14", details:"Project created with 6 team members." },
+  { id:"al2", action:"updated", entity:"worker", entityId:"tm5", entityName:"Noah Williams", performedBy:"Marcus Chen", timestamp:"Jun 16, 2026 11:32", details:"Status changed to on_leave." },
+  { id:"al3", action:"created", entity:"report", entityId:"sr3", entityName:"Building C foundation pour", performedBy:"Priya Shah", timestamp:"Jun 17, 2026 08:05", details:"Site update report created." },
+  { id:"al4", action:"updated", entity:"project", entityId:"oakwood", entityName:"Oakwood Residences", performedBy:"Elena Rodriguez", timestamp:"Jun 18, 2026 14:20", details:"Progress updated to 42%." },
+  { id:"al5", action:"deleted", entity:"resource", entityId:"old_r1", entityName:"Concrete Mixer #3", performedBy:"Marcus Chen", timestamp:"Jun 19, 2026 10:47", details:"Resource decommissioned and removed." },
+  { id:"al6", action:"created", entity:"report", entityId:"sr1", entityName:"Level 14 rebar issue", performedBy:"Elena Rodriguez", timestamp:"Jun 19, 2026 15:30", details:"Site issue report created." },
+  { id:"al7", action:"created", entity:"worker", entityId:"tm11", entityName:"Carlos Mendez", performedBy:"Marcus Chen", timestamp:"Jun 20, 2026 07:12", details:"New electrician added to workforce." },
+  { id:"al8", action:"updated", entity:"report", entityId:"sr2", entityName:"Weekly progress update", performedBy:"Sofia Patel", timestamp:"Jun 20, 2026 09:44", details:"Report status changed to resolved." },
 ];

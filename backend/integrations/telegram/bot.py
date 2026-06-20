@@ -2,9 +2,9 @@ import asyncio
 
 from telethon import TelegramClient
 
-import config
-from bot.history import fetch_history
-from bot.listener import setup_listener
+from integrations.telegram import config
+from integrations.telegram.history import fetch_history
+from integrations.telegram.listener import setup_listener
 
 
 async def main() -> None:
