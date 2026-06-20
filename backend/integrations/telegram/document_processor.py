@@ -2,7 +2,7 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-from bot.gemini_ocr import ocr_image_bytes, ocr_pdf_file
+from .gemini_ocr import ocr_image_bytes, ocr_pdf_file
 
 _ocr_image_bytes = ocr_image_bytes  # alias for internal callers
 

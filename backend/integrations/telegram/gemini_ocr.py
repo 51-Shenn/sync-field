@@ -4,6 +4,8 @@ from pathlib import Path
 from google import genai
 from google.genai import types
 
+from . import config
+
 MODEL = "gemini-3.1-flash-lite"
 PROMPT = "Extract all text from this image. Return only the raw text with no explanation, no markdown formatting."
 
@@ -13,7 +15,6 @@ _client = None
 def _get_client() -> genai.Client:
     global _client
     if _client is None:
-        import config
         _client = genai.Client(api_key=config.GEMINI_API_KEY)
     return _client
 

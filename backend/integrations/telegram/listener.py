@@ -6,11 +6,11 @@ from telethon import TelegramClient, events
 from telethon.tl.types import DocumentAttributeFilename
 from telethon.utils import get_display_name
 
-from bot.document_processor import detect_file_type, ocr_image_file
-from bot.ocr_queue import get_queue
-from bot.transcribe import preload_model, translate_audio
+from .document_processor import detect_file_type, ocr_image_file
+from .ocr_queue import get_queue
+from .transcribe import preload_model, translate_audio
 
-DOWNLOAD_DIR = Path(__file__).resolve().parent.parent / "downloads"
+DOWNLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "downloads"
 
 
 async def setup_listener(client: TelegramClient) -> None:
