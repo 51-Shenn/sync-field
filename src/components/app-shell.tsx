@@ -4,18 +4,19 @@ import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, BriefcaseBusiness, CalendarDays, ChartNoAxesCombined, ChevronDown, ChevronsLeft, ChevronsRight, CircleDollarSign, FileStack, LayoutDashboard, Menu, Search, Settings, Users, X } from "lucide-react";
+import { Bell, BriefcaseBusiness, ChevronDown, ChevronsLeft, ChevronsRight, Fuel, LayoutDashboard, Menu, Monitor, Search, Users, X } from "lucide-react";
 import { projects } from "@/lib/mock-data";
 import { Avatar, Badge, Button, Input } from "@/components/ui";
 import { cn } from "@/lib/utils";
 
 const nav = [
-  { href:"/", label:"Dashboard", icon:LayoutDashboard }, { href:"/projects", label:"Projects", icon:BriefcaseBusiness },
-  { href:"/schedule", label:"Schedule", icon:CalendarDays }, { href:"/team", label:"Team", icon:Users },
-  { href:"/documents", label:"Documents", icon:FileStack }, { href:"/budget", label:"Budget", icon:CircleDollarSign },
-  { href:"/reports", label:"Reports", icon:ChartNoAxesCombined }, { href:"/settings", label:"Settings", icon:Settings },
+  { href:"/control-centre", label:"Control Centre", icon:LayoutDashboard },
+  { href:"/sites", label:"Site Reporting", icon:Monitor },
+  { href:"/projects", label:"Project Management", icon:BriefcaseBusiness },
+  { href:"/workforce", label:"Workforce Management", icon:Users },
+  { href:"/resources", label:"Resource Management", icon:Fuel },
 ];
-const titles: Record<string,string> = { "/":"Dashboard", "/projects":"Projects", "/schedule":"Schedule", "/team":"Team", "/documents":"Documents", "/budget":"Budget", "/reports":"Reports", "/settings":"Settings" };
+const titles: Record<string,string> = { "/":"Control Centre", "/control-centre":"Control Centre", "/sites":"Site Reporting", "/projects":"Project Management", "/workforce":"Workforce Management", "/resources":"Resource Management" };
 
 function Brand({ collapsed = false }: { collapsed?: boolean }) {
   return <Link href="/" className="flex h-16 items-center gap-2.5 overflow-hidden px-3"><Image src="/icon.svg" alt="SyncField" width={40} height={40} className="size-10 shrink-0 object-contain" />{!collapsed && <span className="whitespace-nowrap text-lg font-bold tracking-tight text-white">Sync<span className="text-orange-400">Field</span></span>}</Link>;
