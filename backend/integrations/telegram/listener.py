@@ -112,6 +112,13 @@ async def setup_listener(client: TelegramClient) -> None:
         sent_at_iso = event.date.isoformat()
         chat_title = getattr(event.chat, "title", None) or "Private"
 
+        print(f"\n{'='*50}", flush=True)
+        print(f"[MSG IN] sender={name} telegram_id={telegram_id} chat={chat_title}", flush=True)
+        print(f"[MSG IN] type={'voice' if event.message.voice else 'photo' if event.photo else 'document' if event.message.document else 'text'}", flush=True)
+        if event.text:
+            print(f"[MSG IN] text={event.text[:200]}", flush=True)
+        print(f"{'='*50}", flush=True)
+
         if event.message.voice:
             ts_file = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             tmp = DOWNLOAD_DIR / f"voice_{event.chat_id}_{ts_file}.ogg"

@@ -1,14 +1,15 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 from backend.workflow.dag_engine.dag_engine import FieldOpsDomainRules, DEFAULT_POLICIES
 
 
 class FieldOpsDispatcher:
-    def __init__(self, engine, solver, notifier, policies=None):
+    def __init__(self, engine, solver, notifier, policies=None, sb_client=None):
         self.engine = engine
         self.solver = solver
         self.notifier = notifier
         self.domain_rules = FieldOpsDomainRules(policies or DEFAULT_POLICIES)
+        self.sb_client = sb_client
 
     def process_failure_report(self, task_id: str, failure_type: str, technician_id: str) -> dict:
         decision = self.domain_rules.handle_task_failure(
@@ -80,12 +81,20 @@ class FieldOpsDispatcher:
                 f"You will be notified when status updates."
             )
 
+    def _tech_name(self, technician_id: str) -> str:
+        tech = self.solver.technicians.get(technician_id, {})
+        return tech.get("name", technician_id)
+
     def handle_absence(self, technician_id: str, now_hour: float = 9.0) -> dict:
+        tech_name = self._tech_name(technician_id)
+        print(f"[DISPATCH] handle_absence({technician_id})", flush=True)
+
         orphaned = [
             {"task_id": t_id, "state": t["state"]}
             for t_id, t in self.engine.tasks.items()
             if t.get("assigned_to") == technician_id
         ]
+        print(f"[DISPATCH] orphaned tasks for {technician_id}: {[o['task_id'] + '(' + o['state'] + ')' for o in orphaned]}", flush=True)
 
         freed_ids: list = []
         for task in orphaned:
@@ -93,9 +102,10 @@ class FieldOpsDispatcher:
             self.engine.tasks[t_id]["assigned_to"] = None
             if task["state"] == "ACTIVE":
                 self.engine.tasks[t_id]["state"] = "READY"
+                print(f"[DISPATCH] demoted {t_id}: ACTIVE -> READY", flush=True)
                 self.notifier.notify(
                     f"task_{t_id}",
-                    f"Task {t_id} demoted from ACTIVE to READY — {technician_id} absent."
+                    f"Task {t_id} demoted from ACTIVE to READY — {tech_name} absent."
                 )
             freed_ids.append(t_id)
 
@@ -107,26 +117,55 @@ class FieldOpsDispatcher:
                 for t in self.engine.tasks.values()
             )
         ]
+        print(f"[DISPATCH] idle technicians available: {len(all_idle_techs)}", flush=True)
 
-        assignments = self.solver.solve_reassignment(
-            all_idle_techs, exclude_tasks=set(), now_hour=now_hour
-        )
+        assignments = []
+        try:
+            assignments = self.solver.solve_reassignment(
+                all_idle_techs, exclude_tasks=set(), now_hour=now_hour
+            )
+            print(f"[DISPATCH] VRP solver assignments: {len(assignments)}", flush=True)
+        except Exception as e:
+            import traceback
+            print(f"[DISPATCH] VRP solver failed: {e}", flush=True)
+            traceback.print_exc()
 
         for a in assignments:
             self.engine.tasks[a.task_id]["assigned_to"] = a.technician_id
+            print(f"[DISPATCH] assigned {a.task_id} -> {self._tech_name(a.technician_id)} (score {a.score:.1f})", flush=True)
             self.notifier.notify(
                 a.technician_id,
                 f"Absorbed {a.task_id} (priority score {a.score:.1f})"
             )
 
+        pm_msg = (
+            f"{tech_name} is absent today (MC). "
+            f"Freed {len(freed_ids)} task(s), "
+            f"{len(assignments)} reassigned."
+        )
+        print(f"[DISPATCH] alerting project_manager: {pm_msg}", flush=True)
         self.notifier.alert(
             role="project_manager",
-            payload=(
-                f"Technician {technician_id} absent. "
-                f"Freed {len(freed_ids)} task(s), "
-                f"{len(assignments)} reassigned."
-            )
+            payload=pm_msg,
         )
+
+        if self.sb_client:
+            today = date.today().isoformat()
+            print(f"[DISPATCH] updating technician status: on_leave", flush=True)
+            try:
+                self.sb_client.table("technicians").update({
+                    "status": "on_leave",
+                    "leave_until": today,
+                }).eq("id", technician_id).execute()
+                print(f"[DISPATCH] status updated to on_leave", flush=True)
+            except Exception:
+                try:
+                    self.sb_client.table("technicians").update({
+                        "status": "on_leave",
+                    }).eq("id", technician_id).execute()
+                    print(f"[DISPATCH] status updated (without leave_until)", flush=True)
+                except Exception as e:
+                    print(f"[DISPATCH] status update failed: {e}", flush=True)
 
         return {
             "absent_technician": technician_id,
@@ -136,4 +175,3 @@ class FieldOpsDispatcher:
                 for a in assignments
             ],
         }
-

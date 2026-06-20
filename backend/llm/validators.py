@@ -1,5 +1,5 @@
 VALID_LABELS = {"task_completion", "task_start", "material_request",
-                "issue_report", "progress_update", "instruction", "unclear", "other"}
+                "issue_report", "progress_update", "instruction", "worker_absence", "unclear", "other"}
 
 def validate_output(data, valid_tasks):
     if data.get("label") not in VALID_LABELS:

@@ -430,7 +430,7 @@ class SyncFieldDAG:
         # Factor 2: Time pressure / Deadline proximity
         deadline_score = 0.0
         days_left = None
-        if "deadline" in task:
+        if "deadline" in task and task["deadline"] is not None:
             days_left = (task["deadline"] - datetime.now()).total_seconds() / 86400.0
             deadline_score = max(0.0, (7.0 - days_left) * 5.0)
             score += deadline_score

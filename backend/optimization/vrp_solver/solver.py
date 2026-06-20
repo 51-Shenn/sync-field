@@ -27,8 +27,8 @@ class VRPSolver:
         return math.sqrt((t_lat - task_lat) ** 2 + (t_lng - task_lng) ** 2)
 
     def _is_eligible(self, tech: dict, task: dict, now_hour: float) -> Tuple[bool, str]:
-        required = set(task.get("required_skills", []))
-        tech_skills = set(tech.get("skills", []))
+        required = set(task.get("required_skills") or [])
+        tech_skills = set(tech.get("skills") or [])
         if required and not required.issubset(tech_skills):
             missing = required - tech_skills
             return False, f"skills_missing: {missing}"
