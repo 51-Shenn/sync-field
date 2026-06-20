@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .document_processor import process_document
-from llm.pipeline import process_message
+from backend.llm.pipeline import process_message
 
 
 class OcrQueue:

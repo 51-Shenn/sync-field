@@ -2,10 +2,10 @@ import asyncio
 
 from telethon import TelegramClient
 
-from integrations.telegram import config
-from integrations.telegram.history import fetch_history
-from integrations.telegram.listener import setup_listener
-from integrations.supabase.client import get_supabase_client
+from backend.integrations.telegram import config
+from backend.integrations.telegram.history import fetch_history
+from backend.integrations.telegram.listener import setup_listener
+from backend.integrations.supabase.client import get_supabase_client
 from backend.workflow.dag_engine.dag_engine import SyncFieldDAG
 from backend.optimization.vrp_solver.solver import VRPSolver
 from backend.integrations.notifications.stub import StubNotifier

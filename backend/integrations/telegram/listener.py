@@ -10,7 +10,7 @@ from telethon.utils import get_display_name
 from .document_processor import detect_file_type, ocr_image_file
 from .ocr_queue import get_queue
 from .transcribe import preload_model, translate_audio
-from llm.pipeline import process_message
+from backend.llm.pipeline import process_message
 
 DOWNLOAD_DIR = Path(__file__).resolve().parent.parent.parent / "downloads"
 

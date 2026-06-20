@@ -1,5 +1,5 @@
-from integrations.supabase.client import get_supabase_client
-from llm.analyzer import llm_analyze
+from backend.integrations.supabase.client import get_supabase_client
+from backend.llm.analyzer import llm_analyze
 
 CONFIDENCE_MAP = {"high": 1.0, "low": 0.5}
 
