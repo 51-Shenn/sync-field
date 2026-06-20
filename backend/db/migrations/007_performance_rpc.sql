@@ -57,7 +57,7 @@ begin
     ), '[]'::json),
     'site_reports', coalesce((
       select json_agg(row_to_json(t)) from (
-        select * from site_reports order by created_at desc limit 100
+        select * from site_reports order by created_at desc limit 500
       ) t
     ), '[]'::json),
     'documents', coalesce((

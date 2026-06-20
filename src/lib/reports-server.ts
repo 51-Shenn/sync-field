@@ -19,12 +19,12 @@ export async function getSiteReports(): Promise<SiteReport[]> {
   }));
 }
 
-export async function createSiteReport(input: Omit<SiteReport, "id" | "createdAt"> & { creatorName?: string }): Promise<SiteReport> {
+export async function createSiteReport(input: Omit<SiteReport, "id" | "createdAt">): Promise<SiteReport> {
   const { data, error } = await getSupabaseAdmin()
     .from("site_reports").insert({
       project_id: input.projectId, title: input.title, report_type: input.type,
       description: input.description, status: input.status, created_by: input.createdBy,
-      creator_name: input.creatorName ?? "", attachments: input.attachments,
+      attachments: input.attachments,
     }).select("*").single();
   if (error) throw new Error(error.message);
   return {
@@ -36,7 +36,13 @@ export async function createSiteReport(input: Omit<SiteReport, "id" | "createdAt
   };
 }
 
-export async function updateSiteReport(id: string, input: Partial<SiteReport>): Promise<SiteReport> {
+export async function updateSiteReport(id: string, input: Partial<SiteReport>, userId?: string): Promise<SiteReport> {
+  if (userId) {
+    const { data: existing } = await getSupabaseAdmin()
+      .from("site_reports").select("created_by").eq("id", id).single();
+    if (!existing) throw new Error("Report not found");
+    if (String(existing.created_by) !== userId) throw new Error("Not authorized to update this report");
+  }
   const updates: Record<string, unknown> = {};
   if (input.title !== undefined) updates.title = input.title;
   if (input.projectId !== undefined) updates.project_id = input.projectId;
@@ -56,7 +62,13 @@ export async function updateSiteReport(id: string, input: Partial<SiteReport>): 
   };
 }
 
-export async function deleteSiteReport(id: string): Promise<void> {
+export async function deleteSiteReport(id: string, userId?: string): Promise<void> {
+  if (userId) {
+    const { data: existing } = await getSupabaseAdmin()
+      .from("site_reports").select("created_by").eq("id", id).single();
+    if (!existing) throw new Error("Report not found");
+    if (String(existing.created_by) !== userId) throw new Error("Not authorized to delete this report");
+  }
   const { error } = await getSupabaseAdmin().from("site_reports").delete().eq("id", id);
   if (error) throw new Error(error.message);
 }
