@@ -8,7 +8,7 @@ import { IconBell, IconBriefcase2, IconChevronDown, IconChevronsLeft, IconChevro
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { Avatar, Badge, Button, Dialog, Input, Skeleton } from "@/components/ui";
 import { authClient } from "@/lib/auth-client";
-import { projects } from "@/lib/mock-data";
+import { useProjects } from "@/lib/use-data";
 import { cn } from "@/lib/utils";
 
 const nav = [
@@ -86,6 +86,7 @@ export function Sidebar({ collapsed, setCollapsed }: { collapsed: boolean; setCo
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const { projects } = useProjects();
   const [collapsed, setCollapsed] = useState(false);
   const [mobile, setMobile] = useState(false);
   const [search, setSearch] = useState("");

@@ -6,17 +6,17 @@ import { IconAlertTriangle, IconCalendarClock, IconClipboardCheck, IconHelmet, I
 import { authClient } from "@/lib/auth-client";
 import { useOperations } from "@/components/operations-provider";
 import { PortfolioPulseChart, TaskStatusChart } from "@/components/charts";
-import { useStoredReports } from "@/lib/use-stored-reports";
-import { teamMembers, type SiteReport } from "@/lib/mock-data";
+import { useSiteReports } from "@/lib/use-data";
+import type { SiteReport } from "@/lib/report-types";
 import { Avatar, Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Dialog, Input, Label, Progress, Select, Textarea } from "@/components/ui";
 import { StatCard } from "@/components/page-elements";
 
-const emptyReport = (): Omit<SiteReport, "id" | "createdAt"> => ({ projectId: "", title: "", type: "update", description: "", status: "open", createdBy: teamMembers[0]?.id ?? "", attachments: [] });
+const emptyReport = (): Omit<SiteReport, "id" | "createdAt"> => ({ projectId: "", title: "", type: "update", description: "", status: "open", createdBy: "", attachments: [] });
 
 export function ControlCentreView() {
   const { data: session } = authClient.useSession();
   const { snapshot, loading, error, refresh } = useOperations();
-  const [reports, setReports] = useStoredReports();
+  const { reports, createReport: pushReport } = useSiteReports();
   const [reportOpen, setReportOpen] = useState(false);
   const [reportForm, setReportForm] = useState(emptyReport());
   const userName = session?.user.name?.trim() || session?.user.email?.split("@")[0] || "there";
@@ -27,8 +27,7 @@ export function ControlCentreView() {
   const today = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
 
   function createReport() {
-    const report: SiteReport = { id: `sr${Date.now()}`, createdAt: new Date().toLocaleDateString(), ...reportForm };
-    setReports((current) => [report, ...current]); setReportOpen(false); setReportForm(emptyReport());
+    pushReport(reportForm); setReportOpen(false); setReportForm(emptyReport());
   }
 
   if (loading) return <Card className="p-16 text-center text-sm text-slate-500">Loading live operations…</Card>;
