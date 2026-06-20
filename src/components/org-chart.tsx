@@ -70,15 +70,22 @@ export function OrgChart({ data, onNodeClick, searchQuery }: OrgChartProps) {
       .svgHeight(rect.height)
       .nodeWidth(() => 280)
       .nodeHeight(() => 150)
-      .childrenMargin(() => 65)
-      .siblingsMargin(() => 25)
-      .neighbourMargin(() => 35)
-      .compactMarginBetween(() => 25)
+      .childrenMargin(() => 50)
+      .siblingsMargin(() => 30)
+      .neighbourMargin(() => 40)
+      .compactMarginBetween(() => 30)
+      .compactMarginPair(() => 60)
       .compact(true)
       .rootMargin(20)
       .initialExpandLevel(3)
       .layout("top")
+      .linkYOffset(8)
+      .setActiveNodeCentered(false)
       .scaleExtent([0.1, 5])
+      .nodeButtonWidth(() => 24)
+      .nodeButtonHeight(() => 24)
+      .nodeButtonX(() => -12)
+      .nodeButtonY(() => -12)
       .nodeId((d: any) => d.id)
       .parentNodeId((d: any) => d.parentId)
       .onNodeClick(handleNodeClick)
@@ -125,11 +132,7 @@ export function OrgChart({ data, onNodeClick, searchQuery }: OrgChartProps) {
                     : "background:#fef3c7;color:#b45309;"
                 }
               ">${isActive ? "Active" : "On Leave"}</span>
-              ${
-                node._directSubordinates > 0
-                  ? `<span style="font-size:11px;color:#94a3b8;">${node._directSubordinates} direct report${node._directSubordinates !== 1 ? "s" : ""}</span>`
-                  : `<span style="font-size:11px;color:#94a3b8;">${node.email || ""}</span>`
-              }
+              <span style="font-size:11px;color:#94a3b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:130px;">${node.email || ""}</span>
             </div>
           </div>
         `;
@@ -149,12 +152,13 @@ export function OrgChart({ data, onNodeClick, searchQuery }: OrgChartProps) {
           ">${isExpanded ? "−" : "+"}</div>
         `;
       })
-      .linkUpdate(function (this: any, d: any) {
-        this.style.stroke = d.data._upToTheRootHighlighted
-          ? "#f97316"
-          : "#cbd5e1";
-        this.style.strokeWidth = d.data._upToTheRootHighlighted ? "2.5" : "1.5";
-        this.style.fill = "none";
+      .linkUpdate(function (this: SVGPathElement, d: any) {
+        const hl = d.data._upToTheRootHighlighted;
+        this.setAttribute("stroke", hl ? "#f97316" : "#cbd5e1");
+        this.setAttribute("stroke-width", hl ? "2.5" : "1.5");
+        this.setAttribute("fill", "none");
+        this.setAttribute("stroke-linecap", "round");
+        this.setAttribute("opacity", hl ? "1" : "0.7");
       })
       .render();
 

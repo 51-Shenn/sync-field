@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import * as AvatarPrimitive from "@radix-ui/react-avatar";
@@ -32,7 +33,68 @@ export function Avatar({ name, size = "md", className }: { name: string; size?: 
 export function AvatarStack({ names, limit = 4 }: { names: string[]; limit?: number }) { return <div className="flex -space-x-2">{names.slice(0, limit).map((name) => <Avatar name={name} size="sm" key={name} />)}{names.length > limit && <span className="inline-flex size-7 items-center justify-center rounded-full bg-slate-100 text-[10px] font-semibold text-slate-600 ring-2 ring-white">+{names.length - limit}</span>}</div>; }
 
 export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) { return <input {...props} className={cn("h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-100", props.className)} />; }
-export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) { return <select {...props} className={cn("h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100", props.className)} />; }
+export function MultiSelect({ options, selected, onChange, placeholder, className }: { options: { value: string; label: string }[]; selected: string[]; onChange: (v: string[]) => void; placeholder?: string; className?: string }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const label = selected.length === 0 ? (placeholder ?? "Select...") : selected.length === 1 ? (options.find(o => o.value === selected[0])?.label ?? selected[0]) : `${selected.length} selected`;
+
+  return <div ref={ref} className="relative">
+    <button type="button" onClick={() => setOpen(!open)} className={cn("relative flex h-10 w-full min-w-[160px] items-center rounded-xl border border-slate-200 bg-white px-3 pr-10 text-left text-sm outline-none transition-shadow duration-150 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 hover:shadow-sm", selected.length > 0 ? "text-slate-700" : "text-slate-400", className)}>
+      <span className="flex-1 truncate">{label}</span>
+      <svg className="absolute right-3 size-4 shrink-0 text-slate-400 transition-transform duration-200" style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    {open && <div className="absolute z-50 mt-1.5 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg" style={{ animation: "fade-in 0.12s ease-out" }}>
+      {options.map(opt => {
+        const isSelected = selected.includes(opt.value);
+        return <button key={opt.value} type="button" className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors duration-100 hover:bg-slate-50" onClick={() => onChange(isSelected ? selected.filter(v => v !== opt.value) : [...selected, opt.value])}>
+          <div className={cn("flex size-4 shrink-0 items-center justify-center rounded border transition-colors", isSelected ? "border-orange-500 bg-orange-500 text-white" : "border-slate-300")}>{isSelected && <svg className="size-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>}</div>
+          <span className={cn("flex-1", isSelected ? "font-medium text-slate-900" : "text-slate-600")}>{opt.label}</span>
+        </button>;
+      })}
+      {selected.length > 0 && <button type="button" className="flex w-full items-center gap-3 border-t border-slate-100 px-3 py-2.5 text-left text-xs font-medium text-slate-500 transition-colors hover:bg-slate-50" onClick={() => onChange([])}>Clear all</button>}
+    </div>}
+  </div>;
+}
+
+export function Select({ className, children, value, onChange, ...props }: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  const options = useMemo(() => React.Children.toArray(children).filter((c): c is React.ReactElement<React.OptionHTMLAttributes<HTMLOptionElement>> => React.isValidElement(c) && c.type === "option"), [children]);
+  const label = useMemo(() => options.find(o => o.props.value === value)?.props.children ?? value, [options, value]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  return <div ref={ref} className="relative">
+    <button type="button" onClick={() => setOpen(!open)} className={cn("relative flex h-10 w-full items-center rounded-xl border border-slate-200 bg-white px-3 pr-10 text-left text-sm text-slate-700 outline-none transition-shadow duration-150 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 hover:shadow-sm", className)} {...props as any}>
+      <span className="flex-1 truncate">{label}</span>
+      <svg className="absolute right-3 size-4 shrink-0 text-slate-400 transition-transform duration-200" style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+    </button>
+    {open && <div className="absolute z-50 mt-1.5 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg" style={{ animation: "fade-in 0.12s ease-out" }}>
+      {options.map(opt => {
+        const optValue = opt.props.value ?? String(opt.props.children);
+        const isSelected = opt.props.value === value;
+        return <button key={String(optValue)} type="button" className={cn("flex w-full items-center px-3 py-2.5 text-left text-sm transition-colors duration-100 hover:bg-slate-50", isSelected ? "bg-orange-50 font-medium text-orange-700" : "text-slate-600")} onClick={() => { onChange?.({ target: { value: opt.props.value ?? String(opt.props.children) } } as any); setOpen(false); }}>
+          <span className="flex-1">{opt.props.children}</span>
+          {isSelected && <svg className="size-4 shrink-0 text-orange-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5"/></svg>}
+        </button>;
+      })}
+    </div>}
+  </div>;
+}
 export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) { return <textarea {...props} className={cn("min-h-24 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm outline-none placeholder:text-slate-400 focus:border-orange-400 focus:ring-2 focus:ring-orange-100", props.className)} />; }
 export function Label({ className, ...props }: React.LabelHTMLAttributes<HTMLLabelElement>) { return <label className={cn("mb-1.5 block text-xs font-semibold text-slate-700", className)} {...props} />; }
 export function Separator({ className }: { className?: string }) { return <div className={cn("h-px bg-slate-200", className)} />; }

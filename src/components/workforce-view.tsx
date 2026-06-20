@@ -1,9 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Mail, Phone, Plus, Search, Trash2, Pencil } from "lucide-react";
+import { GitBranch, LayoutGrid, Mail, Phone, Plus, Search, Trash2, Pencil, X } from "lucide-react";
 import { projects, teamMembers as mockMembers, type TeamMember, auditLogs as initialLogs, type AuditLog } from "@/lib/mock-data";
-import { Avatar, Badge, Button, Card, CardContent, Dialog, Input, Label, Select } from "@/components/ui";
+import { Avatar, Badge, Button, Card, CardContent, Dialog, Input, Label, MultiSelect, Select } from "@/components/ui";
 import { OrgChart, type OrgChartNode } from "@/components/org-chart";
 
 const emptyWorker = (): Omit<TeamMember, "id"> => ({ name: "", role: "", email: "", phone: "", avatarUrl: "", status: "active", projectIds: [] });
@@ -11,27 +11,63 @@ const emptyWorker = (): Omit<TeamMember, "id"> => ({ name: "", role: "", email: 
 export function WorkforceView() {
   const [members, setMembers] = useState(mockMembers);
   const [query, setQuery] = useState("");
-  const [role, setRole] = useState("all");
+  const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
+  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState("all");
   const [editMember, setEditMember] = useState<TeamMember | null>(null);
   const [form, setForm] = useState(emptyWorker());
   const [editing, setEditing] = useState(false);
   const [viewMode, setViewMode] = useState<"cards" | "orgchart">("cards");
   const [logs, setLogs] = useState(initialLogs);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const roles = [...new Set(members.map(m => m.role))];
-  const filtered = useMemo(() => members.filter(m => (role === "all" || m.role === role) && `${m.name} ${m.role}`.toLowerCase().includes(query.toLowerCase())), [query, role, members]);
 
-  const orgChartData = useMemo<OrgChartNode[]>(() => members.map(m => ({
-    id: m.id,
-    parentId: m.managerId ?? null,
-    name: m.name,
-    role: m.role,
-    email: m.email,
-    phone: m.phone,
-    status: m.status,
-    avatarUrl: m.avatarUrl,
-    projectIds: m.projectIds,
-  })), [members]);
+  const roles = [...new Set(members.map(m => m.role))];
+  const roleOptions = useMemo(() => roles.map(r => ({ value: r, label: r })), [roles]);
+  const projectOptions = useMemo(() => projects.map(p => ({ value: p.id, label: p.name })), []);
+
+  const filtered = useMemo(() => members.filter(m =>
+    (selectedRoles.length === 0 || selectedRoles.includes(m.role)) &&
+    (selectedProjects.length === 0 || m.projectIds.some(id => selectedProjects.includes(id))) &&
+    (statusFilter === "all" || m.status === statusFilter) &&
+    `${m.name} ${m.role}`.toLowerCase().includes(query.toLowerCase())
+  ), [query, selectedRoles, selectedProjects, statusFilter, members]);
+
+  const orgChartData = useMemo<OrgChartNode[]>(() => {
+    const matchingIds = new Set(members
+      .filter(m =>
+        (selectedRoles.length === 0 || selectedRoles.includes(m.role)) &&
+        (selectedProjects.length === 0 || m.projectIds.some(id => selectedProjects.includes(id))) &&
+        (statusFilter === "all" || m.status === statusFilter) &&
+        `${m.name} ${m.role}`.toLowerCase().includes(query.toLowerCase())
+      )
+      .map(m => m.id));
+
+    if (selectedRoles.length === 0 && selectedProjects.length === 0 && statusFilter === "all" && !query) {
+      return members.map(m => ({
+        id: m.id, parentId: m.managerId ?? null, name: m.name,
+        role: m.role, email: m.email, phone: m.phone, status: m.status,
+        avatarUrl: m.avatarUrl, projectIds: m.projectIds,
+      }));
+    }
+
+    const includeIds = new Set(matchingIds);
+    const memberMap = new Map(members.map(m => [m.id, m]));
+    matchingIds.forEach(id => {
+      let current = memberMap.get(id);
+      while (current?.managerId) {
+        includeIds.add(current.managerId);
+        current = memberMap.get(current.managerId);
+      }
+    });
+
+    return members
+      .filter(m => includeIds.has(m.id))
+      .map(m => ({
+        id: m.id, parentId: m.managerId ?? null, name: m.name,
+        role: m.role, email: m.email, phone: m.phone, status: m.status,
+        avatarUrl: m.avatarUrl, projectIds: m.projectIds,
+      }));
+  }, [members, query, selectedRoles, selectedProjects, statusFilter]);
 
   function log(action: AuditLog["action"], entity: string, entityId: string, entityName: string, details: string) {
     const entry: AuditLog = { id: `al${Date.now()}`, action, entity, entityId, entityName, performedBy: "Marcus Chen", timestamp: new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }), details };
@@ -62,17 +98,34 @@ export function WorkforceView() {
     if (member) openEdit(member);
   }
 
+  const statusOptions = [
+    { value: "all", label: "All statuses" },
+    { value: "active", label: "Active" },
+    { value: "on_leave", label: "On leave" },
+  ];
+
   return <>
-    <div className="mb-5 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row">
-      <div className="relative flex-1"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><Input className="pl-9" placeholder="Search workers..." value={query} onChange={e => setQuery(e.target.value)} /></div>
-      <Select value={role} onChange={e => setRole(e.target.value)}><option value="all">All roles</option>{roles.map(r => <option key={r}>{r}</option>)}</Select>
-      <div className="flex rounded-lg border border-slate-200 p-1">
-        <Button onClick={() => setViewMode("cards")} variant={viewMode === "cards" ? "secondary" : "ghost"} size="sm" className="h-8">Cards</Button>
-        <Button onClick={() => setViewMode("orgchart")} variant={viewMode === "orgchart" ? "secondary" : "ghost"} size="sm" className="h-8">Org Chart</Button>
+    <div className="mb-5 flex flex-col gap-3">
+      <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <Input className="pl-9" placeholder="Search workers by name or role..." value={query} onChange={e => setQuery(e.target.value)} />
+          {query && <button type="button" onClick={() => setQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"><X className="size-4" /></button>}
+        </div>
+        <Dialog trigger={<Button><Plus className="size-4" />Add worker</Button>} title="Add worker profile" description="Enter worker details and project assignments.">
+          <WorkerForm form={form} setForm={setForm} onSave={saveWorker} onCancel={resetForm} editing={false} />
+        </Dialog>
       </div>
-      <Dialog trigger={<Button><Plus className="size-4" />Add worker</Button>} title="Add worker profile" description="Enter worker details and project assignments.">
-        <WorkerForm form={form} setForm={setForm} onSave={saveWorker} onCancel={resetForm} editing={false} />
-      </Dialog>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <MultiSelect options={roleOptions} selected={selectedRoles} onChange={setSelectedRoles} placeholder="All roles" className="sm:min-w-[180px]" />
+        <MultiSelect options={projectOptions} selected={selectedProjects} onChange={setSelectedProjects} placeholder="All projects" className="sm:min-w-[200px]" />
+        <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="sm:min-w-[150px]">{statusOptions.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</Select>
+        <div className="flex rounded-lg border border-slate-200 p-1">
+          <Button onClick={() => setViewMode("cards")} variant={viewMode === "cards" ? "secondary" : "ghost"} size="icon" className="size-8" title="Cards view"><LayoutGrid className="size-4" /></Button>
+          <Button onClick={() => setViewMode("orgchart")} variant={viewMode === "orgchart" ? "secondary" : "ghost"} size="icon" className="size-8" title="Org chart view"><GitBranch className="size-4" /></Button>
+        </div>
+      </div>
     </div>
 
     {viewMode === "orgchart" ? (
@@ -100,7 +153,8 @@ export function WorkforceView() {
         </Card>)}
       </div>
     )}
-    {viewMode === "cards" && filtered.length === 0 && <div className="rounded-xl border border-dashed border-slate-300 bg-white py-20 text-center"><p className="font-medium text-slate-800">No workers found</p><p className="mt-1 text-sm text-slate-500">Try a different search or add a new worker.</p></div>}
+    {viewMode === "cards" && filtered.length === 0 && <div className="rounded-xl border border-dashed border-slate-300 bg-white py-20 text-center"><p className="font-medium text-slate-800">No workers found</p><p className="mt-1 text-sm text-slate-500">Try adjusting your filters.</p></div>}
+    {viewMode === "orgchart" && orgChartData.length === 0 && <div className="rounded-xl border border-dashed border-slate-300 bg-white py-20 text-center"><p className="font-medium text-slate-800">No workers match your filters</p><p className="mt-1 text-sm text-slate-500">Try adjusting your filters.</p></div>}
 
     <Dialog open={dialogOpen} onOpenChange={o => { setDialogOpen(o); if (!o) resetForm(); }} title="Edit worker profile" description="Update worker details.">
       <WorkerForm form={form} setForm={setForm} onSave={saveWorker} onCancel={resetForm} editing={true} />
@@ -112,7 +166,7 @@ function WorkerForm({ form, setForm, onSave, onCancel, editing }: { form: Omit<T
   return <form className="space-y-4" onSubmit={e => { e.preventDefault(); onSave(); }}>
     <div className="grid gap-4 sm:grid-cols-2">
       <div><Label>Full name</Label><Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="Full name" /></div>
-      <div><Label>Role / trade</Label><Input value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} placeholder="e.g. Electrician" /></div>
+      <div><Label>Role</Label><Input value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} placeholder="e.g. Electrician" /></div>
     </div>
     <div><Label>Email</Label><Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="name@company.com" /></div>
     <div><Label>Phone</Label><Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="(555) 000-0000" /></div>
