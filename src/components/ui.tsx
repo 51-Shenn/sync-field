@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useState, useRef, useEffect, useMemo } from "react";
+import { createPortal } from "react-dom";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import * as AvatarPrimitive from "@radix-ui/react-avatar";
@@ -234,6 +235,8 @@ export function MultiSelect({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
 
   useEffect(() => {
     if (!open) return;
@@ -243,6 +246,12 @@ export function MultiSelect({
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open || !buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    setCoords({ top: rect.bottom + 6, left: rect.left, width: rect.width });
   }, [open]);
 
   const label =
@@ -255,6 +264,7 @@ export function MultiSelect({
   return (
     <div ref={ref} className="relative">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
@@ -296,63 +306,71 @@ export function MultiSelect({
           <path d="m6 9 6 6 6-6" />
         </svg>
       </button>
-      {open && (
-        <div
-          className="absolute z-50 mt-1.5 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
-          style={{ animation: "fade-in 0.12s ease-out" }}
-        >
-          {options.map((opt) => {
-            const isSelected = selected.includes(opt.value);
-            return (
-              <button
-                key={opt.value}
-                type="button"
-                className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors duration-100 hover:bg-slate-50"
-                onClick={() =>
-                  onChange(
-                    isSelected
-                      ? selected.filter((v) => v !== opt.value)
-                      : [...selected, opt.value],
-                  )
-                }
-              >
-                <div
-                  className={cn(
-                    "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
-                    isSelected
-                      ? "border-orange-500 bg-orange-500 text-white"
-                      : "border-slate-300",
-                  )}
+      {open &&
+        createPortal(
+          <div
+            className="z-50 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
+            style={{
+              position: "fixed",
+              top: coords.top,
+              left: coords.left,
+              width: coords.width,
+              animation: "fade-in 0.12s ease-out",
+            }}
+          >
+            {options.map((opt) => {
+              const isSelected = selected.includes(opt.value);
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors duration-100 hover:bg-slate-50"
+                  onClick={() =>
+                    onChange(
+                      isSelected
+                        ? selected.filter((v) => v !== opt.value)
+                        : [...selected, opt.value],
+                    )
+                  }
                 >
-                  {isSelected && (
-                    <svg
-                      className="size-3"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="3"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M20 6 9 17l-5-5" />
-                    </svg>
-                  )}
-                </div>
-                <span
-                  className={cn(
-                    "flex-1",
-                    isSelected
-                      ? "font-medium text-slate-900"
-                      : "text-slate-600",
-                  )}
-                >
-                  {opt.label}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
+                  <div
+                    className={cn(
+                      "flex size-4 shrink-0 items-center justify-center rounded border transition-colors",
+                      isSelected
+                        ? "border-orange-500 bg-orange-500 text-white"
+                        : "border-slate-300",
+                    )}
+                  >
+                    {isSelected && (
+                      <svg
+                        className="size-3"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M20 6 9 17l-5-5" />
+                      </svg>
+                    )}
+                  </div>
+                  <span
+                    className={cn(
+                      "flex-1",
+                      isSelected
+                        ? "font-medium text-slate-900"
+                        : "text-slate-600",
+                    )}
+                  >
+                    {opt.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -366,6 +384,8 @@ export function Select({
 }: React.SelectHTMLAttributes<HTMLSelectElement>) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
 
   const options = useMemo(
     () =>
@@ -393,9 +413,16 @@ export function Select({
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
 
+  useEffect(() => {
+    if (!open || !buttonRef.current) return;
+    const rect = buttonRef.current.getBoundingClientRect();
+    setCoords({ top: rect.bottom + 6, left: rect.left, width: rect.width });
+  }, [open]);
+
   return (
     <div ref={ref} className="relative">
       <button
+        ref={buttonRef}
         type="button"
         onClick={() => setOpen(!open)}
         className={cn(
@@ -418,52 +445,60 @@ export function Select({
           <path d="m6 9 6 6 6-6" />
         </svg>
       </button>
-      {open && (
-        <div
-          className="absolute z-50 mt-1.5 w-full overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
-          style={{ animation: "fade-in 0.12s ease-out" }}
-        >
-          {options.map((opt) => {
-            const optValue = opt.props.value ?? String(opt.props.children);
-            const isSelected = opt.props.value === value;
-            return (
-              <button
-                key={String(optValue)}
-                type="button"
-                className={cn(
-                  "flex w-full items-center px-3 py-2.5 text-left text-sm transition-colors duration-100 hover:bg-slate-50",
-                  isSelected
-                    ? "bg-orange-50 font-medium text-orange-700"
-                    : "text-slate-600",
-                )}
-                onClick={() => {
-                  onChange?.({
-                    target: {
-                      value: opt.props.value ?? String(opt.props.children),
-                    },
-                  } as any);
-                  setOpen(false);
-                }}
-              >
-                <span className="flex-1">{opt.props.children}</span>
-                {isSelected && (
-                  <svg
-                    className="size-4 shrink-0 text-orange-500"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  >
-                    <path d="M20 6 9 17l-5-5" />
-                  </svg>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      )}
+      {open &&
+        createPortal(
+          <div
+            className="z-50 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
+            style={{
+              position: "fixed",
+              top: coords.top,
+              left: coords.left,
+              width: coords.width,
+              animation: "fade-in 0.12s ease-out",
+            }}
+          >
+            {options.map((opt) => {
+              const optValue = opt.props.value ?? String(opt.props.children);
+              const isSelected = opt.props.value === value;
+              return (
+                <button
+                  key={String(optValue)}
+                  type="button"
+                  className={cn(
+                    "flex w-full items-center px-3 py-2.5 text-left text-sm transition-colors duration-100 hover:bg-slate-50",
+                    isSelected
+                      ? "bg-orange-50 font-medium text-orange-700"
+                      : "text-slate-600",
+                  )}
+                  onClick={() => {
+                    onChange?.({
+                      target: {
+                        value: opt.props.value ?? String(opt.props.children),
+                      },
+                    } as any);
+                    setOpen(false);
+                  }}
+                >
+                  <span className="flex-1">{opt.props.children}</span>
+                  {isSelected && (
+                    <svg
+                      className="size-4 shrink-0 text-orange-500"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M20 6 9 17l-5-5" />
+                    </svg>
+                  )}
+                </button>
+              );
+            })}
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
@@ -620,12 +655,15 @@ export function Th({
 export function Td({
   children,
   className,
+  colSpan,
 }: {
   children: React.ReactNode;
   className?: string;
+  colSpan?: number;
 }) {
   return (
     <td
+      colSpan={colSpan}
       className={cn(
         "border-b border-slate-100 px-4 py-4 text-slate-600",
         className,
