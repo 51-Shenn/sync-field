@@ -45,9 +45,12 @@ class VRPSolver:
 
         return True, "eligible"
 
-    def _score(self, tech: dict, task: dict, task_id: str) -> float:
+    DISTANCE_PENALTY_WEIGHT = 5.0
+    OBJECTIVE_SCALE = 100
+
+    def _pair_score(self, tech_id: str, task_id: str, tech: dict, task: dict) -> float:
         priority = self.engine.compute_priority(task_id).score
-        distance_penalty = self._distance(tech, task) * 5.0
+        distance_penalty = self._distance(tech, task) * self.DISTANCE_PENALTY_WEIGHT
         return priority - distance_penalty
 
     def solve_reassignment(
@@ -87,11 +90,13 @@ class VRPSolver:
                 model.Add(sum(vars_for_task) <= 1)
 
         objective_terms = []
+        pair_scores: Dict[Tuple[str, str], float] = {}
         for (tech_id, task_id), var in x.items():
             tech = self.technicians[tech_id]
             task = ready_tasks[task_id]
-            score = self._score(tech, task, task_id)
-            objective_terms.append(int(score * 100) * var)
+            score = self._pair_score(tech_id, task_id, tech, task)
+            pair_scores[(tech_id, task_id)] = score
+            objective_terms.append(int(score * self.OBJECTIVE_SCALE) * var)
 
         model.Maximize(sum(objective_terms))
 
@@ -103,9 +108,8 @@ class VRPSolver:
         if status in (cp_model.OPTIMAL, cp_model.FEASIBLE):
             for (tech_id, task_id), var in x.items():
                 if solver.Value(var) == 1:
-                    tech = self.technicians[tech_id]
-                    task = ready_tasks[task_id]
-                    individual_score = round(self._score(tech, task, task_id), 2)
-                    results.append(Assignment(tech_id, task_id, individual_score))
+                    results.append(Assignment(
+                        tech_id, task_id, round(pair_scores[(tech_id, task_id)], 2)
+                    ))
 
         return results
