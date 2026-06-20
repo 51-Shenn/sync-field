@@ -28,6 +28,17 @@ function Brand({ collapsed = false }: { collapsed?: boolean }) {
 function SidebarAccount({ collapsed }: { collapsed: boolean }) {
   const { data: session, isPending } = authClient.useSession();
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
+
+  async function handleLogout() {
+    setLoggingOut(true);
+    const result = await authClient.signOut();
+    if (result.error) {
+      setLoggingOut(false);
+      return;
+    }
+    window.location.replace("/");
+  }
 
   if (isPending) return <div className="p-3"><Skeleton className={cn("h-11 bg-white/10", collapsed ? "w-11" : "w-full")} /></div>;
   if (!session?.user) return <div className="p-3"><GoogleSignInButton compact={collapsed} /></div>;
@@ -47,7 +58,7 @@ function SidebarAccount({ collapsed }: { collapsed: boolean }) {
     <Dialog open={logoutOpen} onOpenChange={setLogoutOpen} title="Log out of SyncField?" description="Are you sure you want to log out of your account?">
       <div className="flex justify-end gap-3">
         <Button variant="outline" onClick={() => setLogoutOpen(false)}>Cancel</Button>
-        <Button variant="danger" onClick={() => authClient.signOut()}><LogOut className="size-4" />Log out</Button>
+        <Button variant="danger" onClick={handleLogout} disabled={loggingOut}>{loggingOut ? "Logging out..." : <><LogOut className="size-4" />Log out</>}</Button>
       </div>
     </Dialog>
   </div>;
