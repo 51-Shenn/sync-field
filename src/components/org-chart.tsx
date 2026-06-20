@@ -17,6 +17,15 @@ export interface OrgChartNode {
   projectIds: string[];
 }
 
+type OrgChartDatum = {
+  data: OrgChartNode;
+  children?: unknown[];
+};
+
+type OrgChartLink = {
+  data: { _upToTheRootHighlighted?: boolean };
+};
+
 const avatarColors = [
   "background:#fed7aa;color:#c2410c",
   "background:#bfdbfe;color:#1d4ed8",
@@ -100,9 +109,9 @@ export function OrgChart({ data, onNodeClick, searchQuery }: OrgChartProps) {
   }, [zoomInput, zoomPercent]);
 
   const handleNodeClick = useCallback(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    (d: any) => {
-      if (onNodeClick) onNodeClick(d.data);
+    (value: unknown) => {
+      const datum = value as OrgChartDatum;
+      if (onNodeClick) onNodeClick(datum.data);
     },
     [onNodeClick]
   );
@@ -112,7 +121,7 @@ export function OrgChart({ data, onNodeClick, searchQuery }: OrgChartProps) {
     expandTimerRef.current = setTimeout(() => {
       const chart = chartRef.current;
       if (!chart) return;
-      const state = chart.getChartState() as any;
+      const state = chart.getChartState() as { lastTransform?: { k?: number } };
       const k: number = state.lastTransform?.k ?? 1;
       if (k > 0.9) {
         chart.zoomOut();
@@ -130,7 +139,7 @@ export function OrgChart({ data, onNodeClick, searchQuery }: OrgChartProps) {
 
     const chart = new D3OrgChart()
       .container(container)
-      .data(data as any)
+      .data(data)
       .svgWidth(rect.width)
       .svgHeight(rect.height)
       .nodeWidth(() => 280)
@@ -151,13 +160,13 @@ export function OrgChart({ data, onNodeClick, searchQuery }: OrgChartProps) {
       .nodeButtonHeight(() => 24)
       .nodeButtonX(() => -12)
       .nodeButtonY(() => -12)
-      .nodeId((d: any) => d.id)
-      .parentNodeId((d: any) => d.parentId)
+      .nodeId((value: unknown) => (value as OrgChartNode).id)
+      .parentNodeId((value: unknown) => (value as OrgChartNode).parentId)
       .onNodeClick(handleNodeClick)
       .onExpandOrCollapse(handleExpandOrCollapse)
       .onZoom(handleChartZoom)
-      .nodeContent(function (this: any, d: any) {
-        const node = d.data;
+      .nodeContent((value: unknown) => {
+        const node = (value as OrgChartDatum).data;
         const colorIdx =
           node.name.charCodeAt(0) % avatarColors.length;
         const avatarColor = avatarColors[colorIdx];
@@ -204,10 +213,11 @@ export function OrgChart({ data, onNodeClick, searchQuery }: OrgChartProps) {
           </div>
         `;
       })
-      .buttonContent(({ node, state }: { node: any; state: any }) => {
-        const count = node.data._directSubordinates || 0;
+      .buttonContent(({ node }: { node: unknown }) => {
+        const datum = node as OrgChartDatum & { data: OrgChartNode & { _directSubordinates?: number } };
+        const count = datum.data._directSubordinates || 0;
         if (count === 0) return "";
-        const isExpanded = node.children;
+        const isExpanded = datum.children;
         return `
           <div style="
             display:flex;align-items:center;justify-content:center;
@@ -219,8 +229,8 @@ export function OrgChart({ data, onNodeClick, searchQuery }: OrgChartProps) {
           ">${isExpanded ? "−" : "+"}</div>
         `;
       })
-      .linkUpdate(function (this: SVGPathElement, d: any) {
-        const hl = d.data._upToTheRootHighlighted;
+      .linkUpdate(function (this: SVGPathElement, value: unknown) {
+        const hl = (value as OrgChartLink).data._upToTheRootHighlighted;
         this.setAttribute("stroke", hl ? "#f97316" : "#cbd5e1");
         this.setAttribute("stroke-width", hl ? "2.5" : "1.5");
         this.setAttribute("fill", "none");

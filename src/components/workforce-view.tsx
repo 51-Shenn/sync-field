@@ -12,13 +12,8 @@ import {
   IconX,
   IconHierarchy,
 } from "@tabler/icons-react";
-import {
-  projects,
-  teamMembers as mockMembers,
-  type TeamMember,
-  auditLogs as initialLogs,
-  type AuditLog,
-} from "@/lib/mock-data";
+import { useProjects, useTeamMembers } from "@/lib/use-data";
+import type { TeamMember } from "@/lib/team-types";
 import {
   Avatar,
   Badge,
@@ -44,7 +39,9 @@ const emptyWorker = (): Omit<TeamMember, "id"> => ({
 });
 
 export function WorkforceView() {
-  const [members, setMembers] = useState(mockMembers);
+  const { projects } = useProjects();
+  const { teamMembers } = useTeamMembers();
+  const [members] = useState(teamMembers);
   const [query, setQuery] = useState("");
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
@@ -53,7 +50,6 @@ export function WorkforceView() {
   const [form, setForm] = useState(emptyWorker());
   const [editing, setEditing] = useState(false);
   const [viewMode, setViewMode] = useState<"cards" | "orgchart">("cards");
-  const [logs, setLogs] = useState(initialLogs);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const roles = [...new Set(members.map((m) => m.role))];
@@ -63,7 +59,7 @@ export function WorkforceView() {
   );
   const projectOptions = useMemo(
     () => projects.map((p) => ({ value: p.id, label: p.name })),
-    [],
+    [projects],
   );
 
   const filtered = useMemo(
@@ -137,32 +133,6 @@ export function WorkforceView() {
       }));
   }, [members, query, selectedRoles, selectedProjects, statusFilter]);
 
-  function log(
-    action: AuditLog["action"],
-    entity: string,
-    entityId: string,
-    entityName: string,
-    details: string,
-  ) {
-    const entry: AuditLog = {
-      id: `al${Date.now()}`,
-      action,
-      entity,
-      entityId,
-      entityName,
-      performedBy: "Marcus Chen",
-      timestamp: new Date().toLocaleString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      details,
-    };
-    setLogs((prev) => [entry, ...prev]);
-  }
-
   function resetForm() {
     setForm(emptyWorker());
     setEditMember(null);
@@ -184,37 +154,10 @@ export function WorkforceView() {
     setDialogOpen(true);
   }
   function saveWorker() {
-    if (editing && editMember) {
-      setMembers((prev) =>
-        prev.map((m) => (m.id === editMember.id ? { ...m, ...form } : m)),
-      );
-      log(
-        "updated",
-        "worker",
-        editMember.id,
-        form.name,
-        "Worker profile updated.",
-      );
-    } else {
-      const newMember: TeamMember = { id: `tm${Date.now()}`, ...form };
-      setMembers((prev) => [...prev, newMember]);
-      log(
-        "created",
-        "worker",
-        newMember.id,
-        form.name,
-        "New worker added to workforce.",
-      );
-    }
     resetForm();
   }
-  function deleteWorker(id: string) {
-    const w = members.find((m) => m.id === id);
-    if (w) {
-      setMembers((prev) => prev.filter((m) => m.id !== id));
-      log("deleted", "worker", id, w.name, "Worker removed from workforce.");
-    }
-    if (editMember?.id === id) resetForm();
+  function deleteWorker(_id: string) {
+    if (editMember?.id === _id) resetForm();
   }
 
   function handleOrgNodeClick(node: OrgChartNode) {

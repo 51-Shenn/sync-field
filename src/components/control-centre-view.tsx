@@ -2,210 +2,47 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { IconCalendarClock, IconClipboardCheck, IconHelmet, IconDots, IconAlertTriangle, IconUsers } from "@tabler/icons-react";
-import { activities, auditLogs as initialLogs, projects, siteReports, tasks, teamMembers, type AuditLog, type SiteReport } from "@/lib/mock-data";
+import { IconAlertTriangle, IconCalendarClock, IconClipboardCheck, IconHelmet, IconUsers } from "@tabler/icons-react";
+import { authClient } from "@/lib/auth-client";
+import { useOperations } from "@/components/operations-provider";
+import { PortfolioPulseChart, TaskStatusChart } from "@/components/charts";
+import { useSiteReports } from "@/lib/use-data";
+import type { SiteReport } from "@/lib/report-types";
 import { Avatar, Badge, Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Dialog, Input, Label, Progress, Select, Textarea } from "@/components/ui";
 import { StatCard } from "@/components/page-elements";
-import { authClient } from "@/lib/auth-client";
-import { PortfolioPulseChart, TaskStatusChart } from "@/components/charts";
-import { useStoredReports } from "@/lib/use-stored-reports";
 
-const emptyReport = (): Omit<SiteReport, "id" | "createdAt"> => ({
-  projectId: "",
-  title: "",
-  type: "update",
-  description: "",
-  status: "open",
-  createdBy: teamMembers[0]?.id ?? "",
-  attachments: [],
-});
-
-function projectFromActivity(target: string) {
-  return projects.find((project) => target.includes(project.name.split(" ")[0]));
-}
-
-function auditHref(log: AuditLog) {
-  if (log.entity === "project" && projects.some((project) => project.id === log.entityId)) return `/projects/${log.entityId}`;
-  if (log.entity === "report") return "/sites";
-  if (log.entity === "worker") return "/workforce";
-  if (log.entity === "resource") return "/resources";
-  return "/control-centre";
-}
+const emptyReport = (): Omit<SiteReport, "id" | "createdAt"> => ({ projectId: "", title: "", type: "update", description: "", status: "open", createdBy: "", attachments: [] });
 
 export function ControlCentreView() {
   const { data: session } = authClient.useSession();
-  const [logs, setLogs] = useState(initialLogs);
-  const [reports, setReports] = useStoredReports();
+  const { snapshot, loading, error, refresh } = useOperations();
+  const { reports, createReport: pushReport } = useSiteReports();
   const [reportOpen, setReportOpen] = useState(false);
   const [reportForm, setReportForm] = useState(emptyReport());
   const userName = session?.user.name?.trim() || session?.user.email?.split("@")[0] || "there";
-  const openIssues = reports.filter(r => r.type === "issue" && r.status === "open").length;
-  const activeProjects = projects.filter(p => p.status === "in_progress").length;
-  const totalCrew = teamMembers.filter(m => m.status === "active").length;
-  const pendingTasks = tasks.filter(t => t.status !== "done").length;
-  const active = projects.filter(p => p.status === "in_progress");
+  const activeProjects = snapshot.projects.filter((project) => project.status === "in_progress");
+  const pendingTasks = snapshot.tasks.filter((task) => !["COMPLETE", "FAILED"].includes(task.state));
+  const activeCrew = snapshot.technicians.filter((member) => ["active", "available"].includes(member.status));
+  const openAlerts = snapshot.alerts.filter((alert) => alert.status === "pending");
   const today = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
 
   function createReport() {
-    const createdAt = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-    const report: SiteReport = { id: `sr${Date.now()}`, createdAt, ...reportForm };
-    const audit: AuditLog = {
-      id: `al${Date.now()}`,
-      action: "created",
-      entity: "report",
-      entityId: report.id,
-      entityName: report.title,
-      performedBy: userName,
-      timestamp: new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }),
-      details: `${report.type === "issue" ? "Issue" : "Site update"} report created.`,
-    };
-    setReports((current) => [report, ...current]);
-    setLogs((current) => [audit, ...current]);
-    setReportOpen(false);
-    setReportForm(emptyReport());
+    pushReport(reportForm); setReportOpen(false); setReportForm(emptyReport());
   }
 
+  if (loading) return <Card className="p-16 text-center text-sm text-slate-500">Loading live operations…</Card>;
   return <>
-    <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-      <div>
-        <p className="mb-1 text-xs font-semibold uppercase tracking-[.15em] text-orange-600">{today}</p>
-        <h2 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Good morning, <span className="text-orange-600">{userName}</span></h2>
-        <p className="mt-1 max-w-2xl text-sm text-slate-500">Here&apos;s what&apos;s happening across your jobsites today.</p>
-      </div>
-      <Dialog open={reportOpen} onOpenChange={(open) => { setReportOpen(open); if (!open) setReportForm(emptyReport()); }} trigger={<Button><IconClipboardCheck className="size-4" />Create report</Button>} title="Create site report" description="Log an update or issue from the Control Centre.">
-        <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); createReport(); }}>
-          <div><Label>Report type</Label><div className="grid grid-cols-2 gap-2"><Button type="button" variant={reportForm.type === "update" ? "secondary" : "outline"} onClick={() => setReportForm({ ...reportForm, type: "update" })}>Site update</Button><Button type="button" variant={reportForm.type === "issue" ? "secondary" : "outline"} onClick={() => setReportForm({ ...reportForm, type: "issue" })}>Issue</Button></div></div>
-          <div><Label>Title</Label><Input required value={reportForm.title} onChange={(event) => setReportForm({ ...reportForm, title: event.target.value })} placeholder="Brief report summary" /></div>
-          <div><Label>Project</Label><Select required value={reportForm.projectId} onChange={(event) => setReportForm({ ...reportForm, projectId: event.target.value })}><option value="">Select project</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</Select></div>
-          <div><Label>Description</Label><Textarea required value={reportForm.description} onChange={(event) => setReportForm({ ...reportForm, description: event.target.value })} placeholder="Describe progress, observations, or the issue..." /></div>
-          <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setReportOpen(false)}>Cancel</Button><Button type="submit">Create report</Button></div>
-        </form>
-      </Dialog>
-    </div>
-
-    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {[
-        { href: "/projects", card: <StatCard label="Active projects" value={String(activeProjects)} trend="+1 this month" icon={<IconHelmet className="size-5" />} /> },
-        { href: "/projects", card: <StatCard label="Tasks due this week" value={String(pendingTasks)} trend="6 completed" icon={<IconCalendarClock className="size-5" />} accent="blue" /> },
-        { href: "/sites", card: <StatCard label="Open issues" value={String(openIssues)} trend={openIssues > 0 ? "needs attention" : "all clear"} icon={<IconAlertTriangle className="size-5" />} accent={openIssues > 0 ? "violet" : "emerald"} /> },
-        { href: "/workforce", card: <StatCard label="Crew on site" value={String(totalCrew)} trend="active today" icon={<IconUsers className="size-5" />} accent="emerald" /> },
-      ].map(({ href, card }, index) => <Link key={href + index} href={href} className="dashboard-rise rounded-xl outline-none transition-transform hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-orange-500/30" style={{ animationDelay: `${index * 70}ms` }}>{card}</Link>)}
-    </section>
-
-    <section className="mt-6 grid gap-6 xl:grid-cols-[1.6fr_1fr]">
-      <Card className="overflow-hidden">
-        <CardHeader>
-          <div>
-            <CardTitle>Portfolio pulse</CardTitle>
-            <CardDescription className="mt-1">Planned versus actual completion across active projects</CardDescription>
-          </div>
-          <Link href="/reports" aria-label="View portfolio reports"><Badge className="bg-emerald-50 text-emerald-700 ring-emerald-600/15 transition-colors hover:bg-emerald-100">On track</Badge></Link>
-        </CardHeader>
-        <CardContent className="pt-3"><PortfolioPulseChart /></CardContent>
-      </Card>
-
-      <Card className="overflow-hidden">
-        <CardHeader>
-          <div>
-            <CardTitle>Task distribution</CardTitle>
-            <CardDescription className="mt-1">Current workflow status across every project</CardDescription>
-          </div>
-          <Link href="/projects" className="text-xs font-semibold text-orange-600 hover:text-orange-700">View tasks</Link>
-        </CardHeader>
-        <CardContent className="pt-3"><TaskStatusChart /></CardContent>
-      </Card>
-    </section>
-
-    <section className="mt-6 grid gap-6 xl:grid-cols-[1.5fr_1fr]">
-      <Card>
-        <CardHeader><div><CardTitle>Project progress</CardTitle><CardDescription className="mt-1">Live progress across active sites</CardDescription></div><Link href="/projects" className="text-xs font-semibold text-orange-600 hover:text-orange-700">View all</Link></CardHeader>
-        <CardContent className="space-y-5 pt-3">
-          {active.map(project => (
-            <div key={project.id} className="group grid gap-3 rounded-xl border border-slate-100 p-4 transition-colors hover:bg-slate-50/70 sm:grid-cols-[1fr_150px_44px] sm:items-center">
-              <div className="flex items-center gap-3">
-                <div className="flex size-10 items-center justify-center rounded-lg text-xs font-bold text-white" style={{ backgroundColor: project.color }}>
-                  {project.name.split(" ").map(n => n[0]).join("")}
-                </div>
-                <div>
-                  <Link href={`/projects/${project.id}`} className="text-sm font-semibold text-slate-900 hover:text-orange-600">{project.name}</Link>
-                  <p className="mt-0.5 text-xs text-slate-500">{project.client} &middot; Due {project.endDate}</p>
-                </div>
-              </div>
-              <div>
-                <div className="mb-1.5 flex justify-between text-[11px] text-slate-500">
-                  <span>{project.progress}% complete</span>
-                </div>
-                <Progress value={project.progress} />
-              </div>
-              <Link href={`/projects/${project.id}`} aria-label={`Open ${project.name}`} className="hidden size-10 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-950 sm:flex"><IconDots className="size-4" /></Link>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><div><CardTitle>Upcoming deadlines</CardTitle><CardDescription className="mt-1">Next 10 days</CardDescription></div><Link href="/projects" className="text-xs font-semibold text-orange-600 hover:text-orange-700">View all</Link></CardHeader>
-        <CardContent className="space-y-1 pt-3">
-          {tasks.filter(t => t.status !== "done").slice(0, 6).map((task, i) => {
-            const project = projects.find(p => p.id === task.projectId)!;
-            return (
-              <Link key={task.id} href={`/projects/${project.id}#schedule`} className="flex gap-3 rounded-lg px-2 py-3 outline-none transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-orange-500/30">
-                <div className={`flex size-10 shrink-0 flex-col items-center justify-center rounded-lg ${i < 2 ? "bg-orange-50 text-orange-700" : "bg-slate-100 text-slate-600"}`}>
-                  <span className="text-[9px] font-bold uppercase">{task.dueDate.split(" ")[0]}</span>
-                  <span className="text-sm font-bold">{task.dueDate.split(" ")[1]}</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-slate-900">{task.title}</p>
-                  <p className="mt-1 truncate text-xs text-slate-500">
-                    <i className="mr-1.5 inline-block size-2 rounded-full" style={{ backgroundColor: project.color }} />
-                    {project.name}
-                  </p>
-                </div>
-                <Badge value={task.priority} />
-              </Link>
-            );
-          })}
-        </CardContent>
-      </Card>
-    </section>
-
-    <section className="mt-6 grid gap-6 xl:grid-cols-[1fr_1fr]">
-      <Card>
-        <CardHeader><div><CardTitle>Recent activity</CardTitle><CardDescription className="mt-1">Updates from your team</CardDescription></div><Link href="/sites" className="text-xs font-semibold text-orange-600 hover:text-orange-700">View reports</Link></CardHeader>
-        <CardContent className="pt-3">
-          {activities.map((item, i) => {
-            const activityProject = projectFromActivity(item.target);
-            return <Link key={i} href={activityProject ? `/projects/${activityProject.id}` : "/sites"} className="relative flex gap-3 rounded-lg pb-5 outline-none last:pb-0 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-orange-500/30">
-              <div className="absolute bottom-0 left-[17px] top-9 w-px bg-slate-100 last:hidden" />
-              <Avatar name={item.person + " Team"} />
-              <div className="pt-0.5 text-sm leading-5 text-slate-600">
-                <span className="font-semibold text-slate-900">{item.person}</span> {item.action} <span className="font-medium text-slate-800">{item.target}</span>
-                <p className="mt-1 text-[11px] text-slate-400">{item.time}</p>
-              </div>
-            </Link>;
-          })}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><div><CardTitle>Audit trail</CardTitle><CardDescription className="mt-1">Recent CRUD actions across the platform</CardDescription></div><Link href="/reports" className="text-xs font-semibold text-orange-600 hover:text-orange-700">View reports</Link></CardHeader>
-        <CardContent className="space-y-2 pt-3">
-          {logs.slice(0, 8).map(log => (
-            <Link key={log.id} href={auditHref(log)} className="flex items-start gap-3 rounded-lg border border-slate-100 p-2.5 outline-none transition-colors hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-orange-500/30">
-              <div className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold text-white ${log.action === "created" ? "bg-emerald-500" : log.action === "deleted" ? "bg-red-500" : "bg-orange-500"}`}>
-                {log.action === "created" ? "+" : log.action === "deleted" ? "–" : "~"}
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-slate-900">
-                  <span className="capitalize">{log.action}</span> {log.entity} <span className="font-normal text-slate-600">&ldquo;{log.entityName}&rdquo;</span>
-                </p>
-                <p className="mt-0.5 text-[10px] text-slate-400">{log.details}</p>
-                <p className="mt-0.5 text-[10px] text-slate-400">{log.performedBy} &middot; {log.timestamp}</p>
-              </div>
-            </Link>
-          ))}
-        </CardContent>
-      </Card>
-    </section>
+    <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end"><div><p className="mb-1 text-xs font-semibold uppercase tracking-[.15em] text-orange-600">{today}</p><h2 className="text-2xl font-bold tracking-tight text-slate-950 sm:text-3xl">Good morning, <span className="text-orange-600">{userName}</span></h2><p className="mt-1 text-sm text-slate-500">Live project, DAG, workforce, alert, and Telegram pipeline status.</p></div><div className="flex gap-2"><Button variant="outline" onClick={() => void refresh()}>Refresh</Button><Dialog open={reportOpen} onOpenChange={setReportOpen} trigger={<Button><IconClipboardCheck className="size-4" />Create report</Button>} title="Create site report"><form className="space-y-4" onSubmit={(event) => { event.preventDefault(); createReport(); }}><div><Label>Type</Label><Select value={reportForm.type} onChange={(event) => setReportForm({ ...reportForm, type: event.target.value as SiteReport["type"] })}><option value="update">Update</option><option value="issue">Issue</option></Select></div><div><Label>Title</Label><Input required value={reportForm.title} onChange={(event) => setReportForm({ ...reportForm, title: event.target.value })} /></div><div><Label>Project</Label><Select required value={reportForm.projectId} onChange={(event) => setReportForm({ ...reportForm, projectId: event.target.value })}><option value="">Select project</option>{snapshot.projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}</Select></div><div><Label>Description</Label><Textarea required value={reportForm.description} onChange={(event) => setReportForm({ ...reportForm, description: event.target.value })} /></div><div className="flex justify-end"><Button type="submit">Create report</Button></div></form></Dialog></div></div>
+    {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[
+      ["/projects", <StatCard key="projects" label="Active projects" value={String(activeProjects.length)} trend={`${snapshot.projects.length} total`} icon={<IconHelmet className="size-5" />} />],
+      ["/projects", <StatCard key="tasks" label="Open DAG tasks" value={String(pendingTasks.length)} trend={`${snapshot.tasks.filter((task) => task.state === "COMPLETE").length} complete`} icon={<IconCalendarClock className="size-5" />} accent="blue" />],
+      ["/sites", <StatCard key="alerts" label="Open alerts" value={String(openAlerts.length)} trend={openAlerts.length ? "needs attention" : "all clear"} icon={<IconAlertTriangle className="size-5" />} accent="violet" />],
+      ["/workforce", <StatCard key="crew" label="Available crew" value={String(activeCrew.length)} trend={`${snapshot.technicians.length} technicians`} icon={<IconUsers className="size-5" />} accent="emerald" />],
+    ].map(([href, card]) => <Link key={String(href) + String((card as React.ReactElement).key)} href={String(href)}>{card}</Link>)}</section>
+    <section className="mt-6 grid gap-6 xl:grid-cols-[1.6fr_1fr]"><Card><CardHeader><div><CardTitle>Portfolio pulse</CardTitle><CardDescription className="mt-1">Planned versus actual progress from project dates and completed DAG nodes.</CardDescription></div></CardHeader><CardContent><PortfolioPulseChart projects={snapshot.projects} /></CardContent></Card><Card><CardHeader><div><CardTitle>DAG distribution</CardTitle><CardDescription className="mt-1">All canonical workflow states.</CardDescription></div></CardHeader><CardContent><TaskStatusChart tasks={snapshot.tasks} /></CardContent></Card></section>
+    <section className="mt-6 grid gap-6 xl:grid-cols-[1.5fr_1fr]"><Card><CardHeader><div><CardTitle>Project progress</CardTitle><CardDescription className="mt-1">Completion calculated from backend tasks.</CardDescription></div></CardHeader><CardContent className="space-y-4">{activeProjects.map((project) => <Link key={project.id} href={`/projects/${project.id}`} className="block rounded-xl border border-slate-100 p-4 hover:bg-slate-50"><div className="flex justify-between"><div><p className="font-semibold text-slate-900">{project.name}</p><p className="mt-1 text-xs text-slate-500">{project.client} · Due {project.endDate || "not set"}</p></div><span className="font-bold text-orange-600">{project.progress}%</span></div><Progress value={project.progress} className="mt-3" /></Link>)}{!activeProjects.length && <p className="py-8 text-center text-sm text-slate-500">No active projects.</p>}</CardContent></Card><Card><CardHeader><div><CardTitle>Upcoming deadlines</CardTitle><CardDescription className="mt-1">Canonical task deadlines.</CardDescription></div></CardHeader><CardContent className="space-y-2">{pendingTasks.filter((task) => task.deadline).sort((a, b) => String(a.deadline).localeCompare(String(b.deadline))).slice(0, 6).map((task) => <Link key={task.id} href={`/projects/${task.projectId}#timeline`} className="flex items-center gap-3 rounded-lg p-2 hover:bg-slate-50"><div className="flex size-10 items-center justify-center rounded-lg bg-orange-50 text-xs font-bold text-orange-700">{new Date(task.deadline!).getDate()}</div><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-slate-900">{task.title}</p><p className="text-xs text-slate-500">{snapshot.projects.find((project) => project.id === task.projectId)?.name}</p></div><Badge value={task.state.toLowerCase()} /></Link>)}</CardContent></Card></section>
+    <section className="mt-6 grid gap-6 xl:grid-cols-2"><Card><CardHeader><div><CardTitle>Backend activity</CardTitle><CardDescription className="mt-1">DAG transitions written by Telegram and dashboard commands.</CardDescription></div></CardHeader><CardContent className="space-y-3">{snapshot.taskEvents.slice(0, 8).map((event) => { const task = snapshot.tasks.find((item) => item.id === event.taskId); return <Link key={event.id} href={task ? `/projects/${task.projectId}#activity` : "/projects"} className="flex gap-3 rounded-lg border border-slate-100 p-3 hover:bg-slate-50"><Avatar name={event.triggeredBy || "System"} size="sm" /><div><p className="text-xs font-semibold text-slate-900">{task?.title || event.taskId} → {event.newState}</p><p className="mt-1 text-xs text-slate-500">{event.reason}</p><p className="mt-1 text-[10px] text-slate-400">{new Date(event.createdAt).toLocaleString()}</p></div></Link>; })}</CardContent></Card><Card><CardHeader><div><CardTitle>Alerts and command health</CardTitle><CardDescription className="mt-1">Failures remain visible until resolved.</CardDescription></div></CardHeader><CardContent className="space-y-3">{[...openAlerts.map((alert) => ({ id: alert.id, title: alert.category || "Workflow alert", detail: alert.message, tone: "alert" })), ...snapshot.commands.filter((command) => command.status === "failed").map((command) => ({ id: command.id, title: `${command.commandType} failed`, detail: command.error || "Unknown worker error", tone: "error" }))].slice(0, 10).map((item) => <div key={item.id} className="rounded-lg border border-red-100 bg-red-50/60 p-3"><p className="text-xs font-semibold text-red-800">{item.title}</p><p className="mt-1 text-xs text-red-700">{item.detail}</p></div>)}{!openAlerts.length && !snapshot.commands.some((command) => command.status === "failed") && <p className="py-8 text-center text-sm text-slate-500">No open alerts or failed commands.</p>}</CardContent></Card></section>
+    <p className="mt-4 text-[10px] text-slate-400">{reports.length} browser-local site reports remain available in Site Reporting and are outside this integration phase.</p>
   </>;
 }

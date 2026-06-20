@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { IconPencil, IconPlus, IconTrash } from "@tabler/icons-react";
-import type { TeamMember } from "@/lib/mock-data";
+import type { TeamMember } from "@/lib/team-types";
 import { Avatar, Button, Card, CardContent, Dialog, Dropdown, DropdownContent, DropdownItem, DropdownTrigger, DropdownValue, Input, Label } from "@/components/ui";
 
 function newId() { return `tm${Date.now()}_${Math.random().toString(36).slice(2, 5)}`; }

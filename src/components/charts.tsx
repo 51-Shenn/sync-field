@@ -23,17 +23,18 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/chart";
-import { projects, tasks } from "@/lib/mock-data";
+import type { OperationsProject, OperationsTask } from "@/lib/operations-types";
 
 const axisProps = { axisLine: false, tickLine: false, fontSize: 11 } as const;
 const animationProps = { isAnimationActive: true, animationDuration: 900, animationEasing: "ease-out" as const };
+const chartToday = new Date().setHours(0, 0, 0, 0);
 
 const completionConfig = {
   progress: { label: "Complete", color: "#f97316" },
 } satisfies ChartConfig;
 
 export function CompletionChart() {
-  const data = projects.map((project) => ({ name: project.name.split(" ")[0], progress: project.progress }));
+  const data: { name: string; progress: number }[] = [];
   return (
     <ChartContainer config={completionConfig} className="h-64">
       <BarChart data={data} layout="vertical" margin={{ left: 8, right: 12 }} accessibilityLayer>
@@ -92,8 +93,14 @@ const pulseConfig = {
   actual: { label: "Actual", color: "#f97316" },
 } satisfies ChartConfig;
 
-export function PortfolioPulseChart() {
-  const data = [
+export function PortfolioPulseChart({ projects: liveProjects }: { projects?: OperationsProject[] }) {
+  const data = liveProjects ? liveProjects.filter((project) => project.status !== "completed").map((project) => {
+    const start = new Date(project.startDate).getTime();
+    const end = new Date(project.endDate).getTime();
+    const planned = Number.isFinite(start) && Number.isFinite(end) && end > start
+      ? Math.max(0, Math.min(100, Math.round(((chartToday - start) / (end - start)) * 100))) : project.progress;
+    return { week: project.name.split(" ")[0], planned, actual: project.progress };
+  }) : [
     { week: "May 16", planned: 42, actual: 39 },
     { week: "May 23", planned: 45, actual: 43 },
     { week: "May 30", planned: 49, actual: 47 },
@@ -121,10 +128,13 @@ export function PortfolioPulseChart() {
 }
 
 const taskConfig = {
-  todo: { label: "To do", color: "#94a3b8" },
-  in_progress: { label: "In progress", color: "#f97316" },
-  review: { label: "In review", color: "#8b5cf6" },
-  done: { label: "Done", color: "#10b981" },
+  locked: { label: "Locked", color: "#94a3b8" },
+  ready: { label: "Ready", color: "#3b82f6" },
+  active: { label: "Active", color: "#f97316" },
+  blocked: { label: "Blocked", color: "#ef4444" },
+  regressed: { label: "Regressed", color: "#8b5cf6" },
+  complete: { label: "Complete", color: "#10b981" },
+  failed: { label: "Failed", color: "#334155" },
 } satisfies ChartConfig;
 
 function PieSegmentLabel({ cx, cy, midAngle, middleRadius, value }: PieLabelRenderProps) {
@@ -135,13 +145,14 @@ function PieSegmentLabel({ cx, cy, midAngle, middleRadius, value }: PieLabelRend
   return <text x={x} y={y} textAnchor="middle" dominantBaseline="central" className="fill-white text-[13px] font-bold tabular-nums">{value}</text>;
 }
 
-export function TaskStatusChart() {
+export function TaskStatusChart({ tasks }: { tasks?: OperationsTask[] }) {
+  const source = tasks ?? [];
   const data = Object.keys(taskConfig).map((status) => ({
     status,
-    count: tasks.filter((task) => task.status === status).length,
+    count: source.filter((task) => task.state.toLowerCase() === status).length,
     fill: taskConfig[status as keyof typeof taskConfig].color,
   }));
-  const complete = data.find((item) => item.status === "done")?.count ?? 0;
+  const complete = data.find((item) => item.status === "complete")?.count ?? 0;
 
   return (
     <ChartContainer config={taskConfig} className="h-[280px]">
@@ -150,9 +161,9 @@ export function TaskStatusChart() {
         <Pie data={data} dataKey="count" nameKey="status" innerRadius={62} outerRadius={90} paddingAngle={3} stroke="transparent" label={PieSegmentLabel} labelLine={false} {...animationProps}>
           {data.map((item) => <Cell key={item.status} fill={item.fill} />)}
         </Pie>
-        <text x="50%" y="45%" textAnchor="middle" dominantBaseline="middle" className="fill-slate-950 text-3xl font-bold">{complete}</text>
-        <text x="50%" y="54%" textAnchor="middle" dominantBaseline="middle" className="fill-slate-400 text-[11px]">completed</text>
-        <Legend verticalAlign="bottom" content={() => <ChartLegendContent keys={["todo", "in_progress", "review", "done"]} />} />
+        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-slate-950 text-3xl font-bold">{complete}</text>
+        <text x="50%" y="58%" textAnchor="middle" dominantBaseline="middle" className="fill-slate-400 text-[11px]">completed</text>
+        <Legend verticalAlign="bottom" content={() => <ChartLegendContent keys={["locked", "ready", "active", "blocked", "regressed", "complete", "failed"]} />} />
       </PieChart>
     </ChartContainer>
   );

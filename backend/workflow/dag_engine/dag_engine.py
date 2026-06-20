@@ -508,7 +508,7 @@ class SyncFieldDAG:
                 "attempt_count": task.get("attempt_count", 0),
                 "earliest_start": earliest.isoformat() if earliest else None,
                 "eta_confidence": task.get("eta_confidence", "UNKNOWN"),
-                "updated_at": "now()",
+                "updated_at": datetime.now().isoformat(),
             })
 
         event_inserts = [{

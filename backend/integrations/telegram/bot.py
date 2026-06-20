@@ -18,6 +18,11 @@ from backend.workflow.event_handlers.event_bus import (
     SupabaseEventBus,
     RealtimeEventBusListener,
 )
+from backend.workflow.command_processor import (
+    CommandProcessor,
+    CommandQueueListener,
+    hydrate_task_rows,
+)
 from backend.llm.pipeline import set_dispatcher
 from datetime import datetime
 
@@ -44,16 +49,14 @@ async def main() -> None:
     sb_client = get_supabase_client()
 
     db_tasks = sb_client.table("tasks").select("*").execute().data or []
-    for t in db_tasks:
-        t.setdefault("task_id", t.pop("id", None))
-    engine = SyncFieldDAG(db_tasks)
+    engine = SyncFieldDAG(hydrate_task_rows(db_tasks))
 
     tech_data = sb_client.table("technicians").select("*").execute().data or []
     tech_db = {t["id"]: t for t in tech_data}
     schedules = _build_schedules(tech_data)
 
     solver = VRPSolver(engine, tech_db)
-    notifier = StubNotifier()
+    notifier = StubNotifier(sb_client)
     dispatcher = FieldOpsDispatcher(engine, solver, notifier, sb_client=sb_client)
     set_dispatcher(dispatcher)
 
@@ -61,6 +64,10 @@ async def main() -> None:
     async_sb = await get_supabase_async_client()
     realtime_listener = RealtimeEventBusListener(event_bus, async_sb=async_sb)
     realtime_listener.start_sync()
+    command_processor = CommandProcessor(dispatcher, solver, sb_client)
+    command_processor.reload_graph()
+    command_listener = CommandQueueListener(command_processor, async_sb)
+    command_listener.start_sync()
 
     client = TelegramClient(
         session="bot_session",
@@ -84,6 +91,7 @@ async def main() -> None:
     finally:
         print("\n[Bot] Shutting down. Cleaning up Event Bus channels...")
         await realtime_listener.stop()
+        await command_listener.stop()
 
 
 if __name__ == "__main__":

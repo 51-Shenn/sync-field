@@ -179,7 +179,7 @@ class TemplateGuesser:
             "name": name,
             "description": description,
             "tasks": serialized_tasks,
-            "updated_at": "now()",
+            "updated_at": datetime.now().isoformat(),
         }
 
         res = self.sb.table("project_templates").upsert(payload).execute()
