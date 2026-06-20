@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import realtime, inspect; print\\('realtime', getattr\\(realtime,'__version__','?'\\)\\); from realtime import AsyncRealtimeChannel as C; print\\(sorted\\(m for m in dir\\(C\\) if not m.startswith\\('_'\\)\\)\\)\")",
+      "mcp__fetch__fetch",
+      "Bash(git push *)",
+      "PowerShell($c = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $p = $c | Select-Object -First 1 -ExpandProperty OwningProcess; Stop-Process -Id $p -Force; \"Stopped PID $p on port 3000\" } else { \"nothing on 3000\" }; Start-Sleep -Milliseconds 500; if \\(Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue\\) { \"3000 still busy\" } else { \"port 3000 FREE\" }; if \\(Get-NetTCPConnection -LocalPort 3001 -State Listen -ErrorAction SilentlyContinue\\) { \"note: port 3001 also has a server running \\(your WSL one\\)\" })",
+      "Bash(npm run *)",
+      "Bash(npx tsc *)",
+      "Bash(python -m py_compile backend/llm/pipeline.py backend/llm/analyzer.py backend/llm/validators.py backend/llm/analysis_prompt.py)",
+      "Bash(git commit -m ' *)",
+      "Bash(git fetch *)",
+      "Bash(git rev-list *)",
+      "Bash(git merge *)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(npm install *)",
+      "Bash(python -m py_compile backend/integrations/notifications/stub.py backend/integrations/telegram/bot.py)"
+    ]
+  }
+}

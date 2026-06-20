@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Set, Optional, Callable, Union
 
 # --- 1. Failure Taxonomy & Domain Configurations ---
@@ -434,7 +434,12 @@ class SyncFieldDAG:
         deadline_score = 0.0
         days_left = None
         if task.get("deadline") is not None:
-            days_left = (task["deadline"] - datetime.now()).total_seconds() / 86400.0
+            deadline = task["deadline"]
+            if isinstance(deadline, str):
+                deadline = datetime.fromisoformat(deadline.replace("Z", "+00:00"))
+            if deadline.tzinfo is None:
+                deadline = deadline.replace(tzinfo=timezone.utc)
+            days_left = (deadline - datetime.now(timezone.utc)).total_seconds() / 86400.0
             deadline_score = max(0.0, (7.0 - days_left) * 5.0)
             score += deadline_score
             data_sources.append("deadline")
@@ -449,7 +454,10 @@ class SyncFieldDAG:
         hours_blocked = 0.0
         blocker_score = 0.0
         if task["state"] == "BLOCKED" and "blocked_since" in task:
-            hours_blocked = (datetime.now() - task["blocked_since"]).total_seconds() / 3600.0
+            bs = task["blocked_since"]
+            if isinstance(bs, str):
+                bs = datetime.fromisoformat(bs.replace("Z", "+00:00"))
+            hours_blocked = (datetime.now(timezone.utc) - bs).total_seconds() / 3600.0
             blocker_score = hours_blocked * 2.0
             score += blocker_score
             data_sources.append("blocked_since")
