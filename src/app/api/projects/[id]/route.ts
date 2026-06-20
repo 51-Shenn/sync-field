@@ -21,9 +21,17 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   const session = await getRequiredSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
-  const { data, error } = await getSupabaseAdmin().from("task_commands").insert({
-    command_type: "project.delete", project_id: id, payload: {}, requested_by: session.user.id,
-  }).select("id,status").single();
+  const sb = getSupabaseAdmin();
+  const { data: taskRows } = await sb.from("tasks").select("id").eq("project_id", id);
+  const taskIds = (taskRows as { id: string }[] | null)?.map((t) => t.id) ?? [];
+  if (taskIds.length) {
+    await sb.from("task_events").delete().in("task_id", taskIds);
+    await sb.from("alerts").delete().in("task_id", taskIds);
+    await sb.from("processed_messages").delete().in("task_id", taskIds);
+  }
+  const { error: taskErr } = await sb.from("tasks").delete().eq("project_id", id);
+  if (taskErr) return NextResponse.json({ error: taskErr.message }, { status: 500 });
+  const { error } = await sb.from("projects").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ commandId: data.id, status: data.status }, { status: 202 });
+  return NextResponse.json({ deleted: true });
 }

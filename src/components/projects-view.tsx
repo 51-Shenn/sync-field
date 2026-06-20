@@ -7,6 +7,7 @@ import {
   IconLayoutGrid,
   IconList,
   IconMapPin,
+  IconPencil,
   IconPlus,
   IconSearch,
   IconTrash,
@@ -61,6 +62,7 @@ export function ProjectsView() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [formError, setFormError] = useState("");
+  const [saving, setSaving] = useState(false);
 
   const filtered = useMemo(
     () =>
@@ -115,6 +117,7 @@ export function ProjectsView() {
       setFormError("Target completion must be after the start date.");
       return;
     }
+    setSaving(true);
     try {
       if (editingId) await updateProject(editingId, form);
       else await createProject(form);
@@ -124,6 +127,8 @@ export function ProjectsView() {
       setFormError(
         reason instanceof Error ? reason.message : "Unable to save project",
       );
+    } finally {
+      setSaving(false);
     }
   }
 
@@ -250,11 +255,11 @@ export function ProjectsView() {
                     </div>
                     <div className="flex gap-1">
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="ghost"
                         onClick={() => openEdit(project)}
                       >
-                        Edit
+                        <IconPencil className="size-4" />
                       </Button>
                       <Button
                         size="icon"
@@ -320,11 +325,11 @@ export function ProjectsView() {
                     </Td>
                     <Td>
                       <Button
-                        size="sm"
+                        size="icon"
                         variant="ghost"
                         onClick={() => openEdit(project)}
                       >
-                        Edit
+                        <IconPencil className="size-4" />
                       </Button>
                     </Td>
                   </tr>
@@ -464,7 +469,7 @@ export function ProjectsView() {
             >
               Cancel
             </Button>
-            <Button type="submit">
+            <Button type="submit" disabled={saving}>
               {editingId ? "Save changes" : "Create project"}
             </Button>
           </div>
