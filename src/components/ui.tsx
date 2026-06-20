@@ -6,7 +6,8 @@ import { createPortal } from "react-dom";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import * as TabsPrimitive from "@radix-ui/react-tabs";
 import * as AvatarPrimitive from "@radix-ui/react-avatar";
-import { IconX } from "@tabler/icons-react";
+import * as SelectPrimitive from "@radix-ui/react-select";
+import { IconCheck, IconChevronDown, IconX } from "@tabler/icons-react";
 import { cn, initials } from "@/lib/utils";
 
 export function Button({
@@ -107,6 +108,7 @@ const badgeStyles: Record<string, string> = {
   high: "bg-red-50 text-red-700 ring-red-600/15",
   overdue: "bg-red-50 text-red-700 ring-red-600/15",
 };
+
 export function Badge({
   value,
   children,
@@ -163,10 +165,12 @@ const avatarColors = [
 ];
 export function Avatar({
   name,
+  src,
   size = "md",
   className,
 }: {
   name: string;
+  src?: string | null;
   size?: "sm" | "md" | "lg" | "xl";
   className?: string;
 }) {
@@ -175,7 +179,7 @@ export function Avatar({
     <AvatarPrimitive.Root
       title={name}
       className={cn(
-        "inline-flex shrink-0 items-center justify-center rounded-full font-semibold ring-2 ring-white",
+        "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full font-semibold ring-2 ring-white",
         avatarColors[index],
         size === "sm" && "size-7 text-[10px]",
         size === "md" && "size-9 text-xs",
@@ -184,10 +188,19 @@ export function Avatar({
         className,
       )}
     >
+      {src && (
+        <AvatarPrimitive.Image
+          src={src}
+          alt={name}
+          className="size-full object-cover"
+          referrerPolicy="no-referrer"
+        />
+      )}
       <AvatarPrimitive.Fallback>{initials(name)}</AvatarPrimitive.Fallback>
     </AvatarPrimitive.Root>
   );
 }
+
 export function AvatarStack({
   names,
   limit = 4,
@@ -220,6 +233,89 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
     />
   );
 }
+
+export function Dropdown({
+  value,
+  onValueChange,
+  children,
+  ...props
+}: { value: string; onValueChange: (value: string) => void; children: React.ReactNode } & Omit<
+  React.ComponentPropsWithoutRef<typeof SelectPrimitive.Root>,
+  "value" | "onValueChange"
+>) {
+  return (
+    <SelectPrimitive.Root value={value} onValueChange={onValueChange} {...props}>
+      {children}
+    </SelectPrimitive.Root>
+  );
+}
+
+export function DropdownTrigger({
+  className,
+  children,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>) {
+  return (
+    <SelectPrimitive.Trigger
+      className={cn(
+        "flex h-8 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 outline-none hover:border-slate-300 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 data-[placeholder]:text-slate-400 [&>span]:line-clamp-1",
+        className,
+      )}
+      {...props}
+    >
+      {children}
+      <SelectPrimitive.Icon asChild>
+        <IconChevronDown className="size-3.5 shrink-0 text-slate-400" />
+      </SelectPrimitive.Icon>
+    </SelectPrimitive.Trigger>
+  );
+}
+
+export function DropdownValue(
+  props: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Value>,
+) {
+  return <SelectPrimitive.Value {...props} />;
+}
+
+export function DropdownContent({
+  children,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>) {
+  return (
+    <SelectPrimitive.Portal>
+      <SelectPrimitive.Content
+        position="popper"
+        sideOffset={4}
+        className="z-50 max-h-56 min-w-[8rem] overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        {...props}
+      >
+        {children}
+      </SelectPrimitive.Content>
+    </SelectPrimitive.Portal>
+  );
+}
+
+export function DropdownItem({
+  value,
+  children,
+  ...props
+}: React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item> & {
+  value: string;
+}) {
+  return (
+    <SelectPrimitive.Item
+      value={value}
+      className="relative flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-xs text-slate-700 outline-none hover:bg-slate-100 data-[highlighted]:bg-orange-50 data-[highlighted]:text-orange-700 focus:bg-slate-100"
+      {...props}
+    >
+      <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
+      <SelectPrimitive.ItemIndicator className="absolute right-1.5">
+        <IconCheck className="size-3.5 text-orange-600" />
+      </SelectPrimitive.ItemIndicator>
+    </SelectPrimitive.Item>
+  );
+}
+
 export function MultiSelect({
   options,
   selected,
@@ -502,6 +598,7 @@ export function Select({
     </div>
   );
 }
+
 export function Textarea(
   props: React.TextareaHTMLAttributes<HTMLTextAreaElement>,
 ) {
@@ -515,6 +612,7 @@ export function Textarea(
     />
   );
 }
+
 export function Label({
   className,
   ...props
@@ -529,9 +627,11 @@ export function Label({
     />
   );
 }
+
 export function Separator({ className }: { className?: string }) {
   return <div className={cn("h-px bg-slate-200", className)} />;
 }
+
 export function Skeleton({ className }: { className?: string }) {
   return (
     <div className={cn("animate-pulse rounded-lg bg-slate-100", className)} />
@@ -560,7 +660,7 @@ export function Dialog({
       ) : null}
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-[2px] data-[state=open]:animate-in" />
-        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-6xl -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl outline-none">
+        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl outline-none">
           <DialogPrimitive.Title className="text-lg font-semibold text-slate-950">
             {title}
           </DialogPrimitive.Title>
@@ -583,36 +683,77 @@ export function Tabs({
   tabs,
   defaultValue,
   className,
+  useHash,
 }: {
   tabs: { value: string; label: string; content: React.ReactNode }[];
   defaultValue?: string;
   className?: string;
+  useHash?: boolean;
 }) {
-  return (
+  const [value, setValue] = React.useState(defaultValue ?? tabs[0]?.value);
+
+  React.useEffect(() => {
+    if (!useHash) return;
+    const sync = () => {
+      const hash = window.location.hash.replace("#", "");
+      if (hash && tabs.some((t) => t.value === hash)) setValue(hash);
+    };
+    sync();
+    window.addEventListener("hashchange", sync);
+    window.addEventListener("popstate", sync);
+    return () => {
+      window.removeEventListener("hashchange", sync);
+      window.removeEventListener("popstate", sync);
+    };
+  }, [useHash, tabs]);
+
+  const onValueChange = (v: string) => {
+    if (useHash) {
+      setValue(v);
+      window.history.replaceState(null, "", `#${v}`);
+    }
+  };
+
+  const list = (
+    <TabsPrimitive.List className="flex w-full gap-1 overflow-x-auto border-b border-slate-200">
+      {tabs.map((tab) => (
+        <TabsPrimitive.Trigger
+          key={tab.value}
+          value={tab.value}
+          className="shrink-0 border-b-2 border-transparent px-4 py-3 text-sm font-medium text-slate-500 outline-none transition-colors hover:text-slate-900 data-[state=active]:border-orange-500 data-[state=active]:text-slate-950"
+        >
+          {tab.label}
+        </TabsPrimitive.Trigger>
+      ))}
+    </TabsPrimitive.List>
+  );
+
+  const content = tabs.map((tab) => (
+    <TabsPrimitive.Content
+      key={tab.value}
+      value={tab.value}
+      className="mt-5 outline-none"
+    >
+      {tab.content}
+    </TabsPrimitive.Content>
+  ));
+
+  return useHash ? (
+    <TabsPrimitive.Root
+      value={value}
+      onValueChange={onValueChange}
+      className={className}
+    >
+      {list}
+      {content}
+    </TabsPrimitive.Root>
+  ) : (
     <TabsPrimitive.Root
       defaultValue={defaultValue ?? tabs[0]?.value}
       className={className}
     >
-      <TabsPrimitive.List className="flex w-full gap-1 overflow-x-auto border-b border-slate-200">
-        {tabs.map((tab) => (
-          <TabsPrimitive.Trigger
-            key={tab.value}
-            value={tab.value}
-            className="shrink-0 border-b-2 border-transparent px-4 py-3 text-sm font-medium text-slate-500 outline-none transition-colors hover:text-slate-900 data-[state=active]:border-orange-500 data-[state=active]:text-slate-950"
-          >
-            {tab.label}
-          </TabsPrimitive.Trigger>
-        ))}
-      </TabsPrimitive.List>
-      {tabs.map((tab) => (
-        <TabsPrimitive.Content
-          key={tab.value}
-          value={tab.value}
-          className="mt-5 outline-none"
-        >
-          {tab.content}
-        </TabsPrimitive.Content>
-      ))}
+      {list}
+      {content}
     </TabsPrimitive.Root>
   );
 }

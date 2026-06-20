@@ -4,9 +4,9 @@ import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconBell, IconBriefcase2, IconChevronDown, IconChevronsLeft, IconChevronsRight, IconGasStation, IconLayoutDashboard, IconMenu2, IconDeviceDesktop, IconSearch, IconUsers, IconX } from "@tabler/icons-react";
+import { IconBell, IconBriefcase2, IconChevronDown, IconChevronsLeft, IconChevronsRight, IconGasStation, IconLayoutDashboard, IconLogout, IconMenu2, IconDeviceDesktop, IconSearch, IconSettings, IconUsers, IconX } from "@tabler/icons-react";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
-import { Avatar, Badge, Button, Input, Skeleton } from "@/components/ui";
+import { Avatar, Badge, Button, Dialog, Input, Skeleton } from "@/components/ui";
 import { authClient } from "@/lib/auth-client";
 import { projects } from "@/lib/mock-data";
 import { cn } from "@/lib/utils";
@@ -18,8 +18,6 @@ const nav = [
   { href:"/workforce", label:"Workforce Management", icon:IconUsers },
   { href:"/resources", label:"Resource Management", icon:IconGasStation },
 ];
-const titles: Record<string,string> = { "/":"Control Centre", "/control-centre":"Control Centre", "/sites":"Site Reporting", "/projects":"Project Management", "/workforce":"Workforce Management", "/resources":"Resource Management" };
-
 function Brand({ collapsed = false }: { collapsed?: boolean }) {
   return <Link href="/" className="flex h-16 items-center gap-2.5 overflow-hidden px-3">
     <Image src="/icon.svg" alt="SyncField" width={40} height={40} className="size-10 shrink-0 object-contain" />
@@ -29,23 +27,40 @@ function Brand({ collapsed = false }: { collapsed?: boolean }) {
 
 function SidebarAccount({ collapsed }: { collapsed: boolean }) {
   const { data: session, isPending } = authClient.useSession();
+  const [logoutOpen, setLogoutOpen] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
-  if (isPending) return <div className="border-t border-white/8 p-3"><Skeleton className={cn("h-11 bg-white/10", collapsed ? "w-11" : "w-full")} /></div>;
-  if (!session?.user) return <div className="border-t border-white/8 p-3"><GoogleSignInButton compact={collapsed} /></div>;
+  async function handleLogout() {
+    setLoggingOut(true);
+    const result = await authClient.signOut();
+    if (result.error) {
+      setLoggingOut(false);
+      return;
+    }
+    window.location.replace("/");
+  }
+
+  if (isPending) return <div className="p-3"><Skeleton className={cn("h-11 bg-white/10", collapsed ? "w-11" : "w-full")} /></div>;
+  if (!session?.user) return <div className="p-3"><GoogleSignInButton compact={collapsed} /></div>;
 
   const userName = session.user.name || session.user.email || "Account";
-  return <div className="border-t border-white/8 p-3">
+  return <div className="p-3">
     <details className="group relative">
       <summary className={cn("flex cursor-pointer list-none items-center gap-3 rounded-lg p-2 hover:bg-white/7", collapsed && "justify-center")}>
-        <Avatar name={userName} />
+        <Avatar name={userName} src={session.user.image} />
         {!collapsed && <><div className="min-w-0 flex-1"><p className="truncate text-sm font-semibold text-white">{userName}</p><p className="truncate text-xs text-slate-400">{session.user.email}</p></div><IconChevronDown className="size-4 transition-transform group-open:rotate-180" /></>}
       </summary>
-      <div className="absolute bottom-full left-0 mb-2 w-48 rounded-lg border border-slate-200 bg-white p-1 text-sm text-slate-700 shadow-xl">
-        <button className="w-full rounded-md px-3 py-2 text-left hover:bg-slate-50">Profile</button>
-        <Link href="/settings" className="block rounded-md px-3 py-2 hover:bg-slate-50">Settings</Link>
-        <button onClick={() => authClient.signOut()} className="w-full rounded-md px-3 py-2 text-left text-red-600 hover:bg-red-50">Log out</button>
+      <div className="absolute bottom-full left-0 mb-2 w-48 rounded-xl border border-white/20 bg-slate-900/70 p-1.5 text-sm text-white shadow-2xl shadow-slate-950/30 backdrop-blur-xl">
+        <Link href="/settings" className="flex items-center gap-2.5 rounded-lg px-3 py-2 hover:bg-white/10"><IconSettings className="size-4" />Settings</Link>
+        <button onClick={() => setLogoutOpen(true)} className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-left text-red-300 hover:bg-white/10 hover:text-red-200"><IconLogout className="size-4" />Log out</button>
       </div>
     </details>
+    <Dialog open={logoutOpen} onOpenChange={setLogoutOpen} title="Log out of SyncField?" description="Are you sure you want to log out of your account?">
+      <div className="flex justify-end gap-3">
+        <Button variant="outline" onClick={() => setLogoutOpen(false)}>Cancel</Button>
+        <Button variant="danger" onClick={handleLogout} disabled={loggingOut}>{loggingOut ? "Logging out..." : <><IconLogout className="size-4" />Log out</>}</Button>
+      </div>
+    </Dialog>
   </div>;
 }
 
@@ -72,12 +87,10 @@ export function Sidebar({ collapsed, setCollapsed }: { collapsed: boolean; setCo
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobile, setMobile] = useState(false);
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
-  const title = pathname.startsWith("/projects/") ? projects.find(project => pathname.endsWith(project.id))?.name ?? "Project details" : titles[pathname] ?? "SyncField";
   const results = useMemo(() => search.length < 2 ? [] : [
     ...nav.map(item => ({ label: item.label, href: item.href, type: "Page" })),
     ...projects.map(project => ({ label: project.name, href: `/projects/${project.id}`, type: "Project" })),
@@ -89,7 +102,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className={cn("transition-[padding] duration-200", collapsed ? "lg:pl-[72px]" : "lg:pl-60")}>
       <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-slate-200/80 bg-white/90 px-4 backdrop-blur-lg sm:px-6">
         <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobile(true)} aria-label="Open menu"><IconMenu2 className="size-5" /></Button>
-        <div className="min-w-0"><p className="text-[11px] font-medium text-slate-400">SyncField / <span className="text-slate-500">{title}</span></p><h1 className="truncate text-lg font-semibold tracking-tight text-slate-950">{title}</h1></div>
         <div className="ml-auto flex items-center gap-2">
           <div className="relative hidden w-64 md:block"><IconSearch className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><Input value={search} onChange={(event) => { setSearch(event.target.value); setSearchOpen(true); }} onFocus={() => setSearchOpen(true)} placeholder="Search projects, tasks..." className="pl-9" />{searchOpen && results.length > 0 && <div className="absolute right-0 top-12 w-80 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">{results.map(result => <Link key={result.href + result.label} href={result.href} onClick={() => { setSearchOpen(false); setSearch(""); }} className="flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-slate-50"><span className="text-sm font-medium text-slate-800">{result.label}</span><Badge>{result.type}</Badge></Link>)}</div>}</div>
           <Button variant="ghost" size="icon" className="relative" aria-label="Notifications"><IconBell className="size-5" /><span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-orange-500 text-[9px] font-bold text-white ring-2 ring-white">4</span></Button>
