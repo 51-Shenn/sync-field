@@ -22,7 +22,7 @@ export async function DELETE(_request: Request, { params }: { params: Promise<{ 
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const { id } = await params;
   const { data, error } = await getSupabaseAdmin().from("task_commands").insert({
-    command_type: "project.delete", project_id: id, payload: {},     requested_by: session.user.name || session.user.email,
+    command_type: "project.delete", project_id: id, payload: {}, requested_by: session.user.id,
   }).select("id,status").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ commandId: data.id, status: data.status }, { status: 202 });

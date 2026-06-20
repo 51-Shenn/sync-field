@@ -10,6 +10,30 @@ import * as SelectPrimitive from "@radix-ui/react-select";
 import { IconCheck, IconChevronDown, IconX } from "@tabler/icons-react";
 import { cn, initials } from "@/lib/utils";
 
+/* ------------------------------------------------------------------ */
+/*  Dropdown manager – only one dropdown open at a time               */
+/* ------------------------------------------------------------------ */
+const dropdownClosers = new Set<() => void>();
+
+function closeOtherDropdowns(keep?: () => void) {
+  for (const closer of dropdownClosers) {
+    if (closer !== keep) closer();
+  }
+  if (keep) {
+    dropdownClosers.clear();
+    dropdownClosers.add(keep);
+  } else {
+    dropdownClosers.clear();
+  }
+}
+
+function registerCloser(closer: () => void) {
+  dropdownClosers.add(closer);
+}
+function unregisterCloser(closer: () => void) {
+  dropdownClosers.delete(closer);
+}
+
 export function Button({
   className,
   variant = "default",
@@ -234,6 +258,97 @@ export function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
   );
 }
 
+export function Select({
+  className,
+  children,
+  value,
+  defaultValue,
+  onChange,
+  ...props
+}: React.SelectHTMLAttributes<HTMLSelectElement>) {
+  const [open, setOpen] = useState(false);
+  const closerRef = useRef<() => void>(() => {});
+
+  useEffect(
+    () => () => { unregisterCloser(closerRef.current); },
+    [],
+  );
+
+  const options = useMemo(
+    () =>
+      React.Children.toArray(children).filter(
+        (
+          c,
+        ): c is React.ReactElement<
+          React.OptionHTMLAttributes<HTMLOptionElement>
+        > => React.isValidElement(c) && c.type === "option",
+      ),
+    [children],
+  );
+  const placeholder = options.find((option) => String(option.props.value ?? option.props.children) === "")?.props.children;
+  const controlledValue = value === undefined ? undefined : String(value);
+  const initialValue = defaultValue === undefined ? undefined : String(defaultValue);
+  return (
+    <SelectPrimitive.Root
+      open={open}
+      value={controlledValue}
+      defaultValue={initialValue}
+      name={props.name}
+      disabled={props.disabled}
+      required={props.required}
+      onOpenChange={(newOpen) => {
+        if (newOpen) {
+          const closer = () => setOpen(false);
+          closerRef.current = closer;
+          closeOtherDropdowns(closer);
+        } else {
+          unregisterCloser(closerRef.current);
+        }
+        setOpen(newOpen);
+      }}
+      onValueChange={(newValue) => {
+        const target = { value: newValue } as HTMLSelectElement;
+        onChange?.({ target, currentTarget: target } as React.ChangeEvent<HTMLSelectElement>);
+      }}
+    >
+      <SelectPrimitive.Trigger
+        id={props.id}
+        aria-label={props["aria-label"]}
+        className={cn(
+          "flex h-10 w-full max-w-full items-center justify-between rounded-xl border border-slate-200 bg-white px-3 text-left text-sm text-slate-700 outline-none transition-shadow hover:shadow-sm focus:border-orange-400 focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:opacity-50",
+          className,
+        )}
+      >
+        <SelectPrimitive.Value placeholder={placeholder} />
+        <SelectPrimitive.Icon asChild><IconChevronDown className="size-4 shrink-0 text-slate-400" /></SelectPrimitive.Icon>
+      </SelectPrimitive.Trigger>
+      <SelectPrimitive.Portal>
+        <SelectPrimitive.Content position="popper" sideOffset={6} className="z-[9999] min-w-[var(--radix-select-trigger-width)] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg">
+          <SelectPrimitive.Viewport className="p-1">
+            {options.map((option) => {
+              const optionValue = String(option.props.value ?? option.props.children);
+              if (!optionValue) return null;
+              return (
+                <SelectPrimitive.Item
+                  key={optionValue}
+                  value={optionValue}
+                  disabled={option.props.disabled}
+                  className="relative flex cursor-default select-none items-center rounded-lg py-2.5 pl-3 pr-9 text-sm text-slate-600 outline-none data-[highlighted]:bg-slate-50 data-[state=checked]:bg-orange-50 data-[state=checked]:font-medium data-[state=checked]:text-orange-700 data-[disabled]:pointer-events-none data-[disabled]:opacity-50"
+                >
+                  <SelectPrimitive.ItemText>{option.props.children}</SelectPrimitive.ItemText>
+                  <SelectPrimitive.ItemIndicator className="absolute right-3">
+                    <IconCheck className="size-4 text-orange-500" />
+                  </SelectPrimitive.ItemIndicator>
+                </SelectPrimitive.Item>
+              );
+            })}
+          </SelectPrimitive.Viewport>
+        </SelectPrimitive.Content>
+      </SelectPrimitive.Portal>
+    </SelectPrimitive.Root>
+  );
+}
+
 export function Dropdown({
   value,
   onValueChange,
@@ -258,7 +373,7 @@ export function DropdownTrigger({
   return (
     <SelectPrimitive.Trigger
       className={cn(
-        "flex h-8 w-full items-center justify-between rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 outline-none hover:border-slate-300 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 data-[placeholder]:text-slate-400 [&>span]:line-clamp-1",
+        "flex h-8 w-full max-w-full items-center justify-between rounded-md border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 outline-none hover:border-slate-300 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 data-[placeholder]:text-slate-400 [&>span]:line-clamp-1",
         className,
       )}
       {...props}
@@ -286,7 +401,7 @@ export function DropdownContent({
       <SelectPrimitive.Content
         position="popper"
         sideOffset={4}
-        className="z-50 max-h-56 min-w-[8rem] overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        className="z-[9999] max-h-56 min-w-[8rem] overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
         {...props}
       >
         {children}
@@ -305,7 +420,7 @@ export function DropdownItem({
   return (
     <SelectPrimitive.Item
       value={value}
-      className="relative flex cursor-pointer select-none items-center rounded-md px-2 py-1.5 text-xs text-slate-700 outline-none hover:bg-slate-100 data-[highlighted]:bg-orange-50 data-[highlighted]:text-orange-700 focus:bg-slate-100"
+      className="relative flex cursor-pointer select-none items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-slate-600 outline-none transition-colors duration-100 hover:bg-slate-50 data-[highlighted]:bg-orange-50 data-[highlighted]:text-orange-700 data-[state=checked]:font-medium data-[state=checked]:text-orange-700"
       {...props}
     >
       <SelectPrimitive.ItemText>{children}</SelectPrimitive.ItemText>
@@ -334,12 +449,20 @@ export function MultiSelect({
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
+  const closerRef = useRef<() => void>(() => {});
+
+  useEffect(
+    () => () => { unregisterCloser(closerRef.current); },
+    [],
+  );
 
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node) && !menuRef.current?.contains(e.target as Node))
+      if (ref.current && !ref.current.contains(e.target as Node) && !menuRef.current?.contains(e.target as Node)) {
+        unregisterCloser(closerRef.current);
         setOpen(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -358,12 +481,24 @@ export function MultiSelect({
         ? (options.find((o) => o.value === selected[0])?.label ?? selected[0])
         : `${selected.length} selected`;
 
+  function toggle() {
+    if (open) {
+      unregisterCloser(closerRef.current);
+      setOpen(false);
+    } else {
+      const closer = () => { setOpen(false); };
+      closerRef.current = closer;
+      closeOtherDropdowns(closer);
+      setOpen(true);
+    }
+  }
+
   return (
     <div ref={ref} className="relative">
       <button
         ref={buttonRef}
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={toggle}
         className={cn(
           "relative flex h-10 w-full min-w-[160px] items-center gap-0.5 rounded-xl border border-slate-200 bg-white px-3 text-left text-sm outline-none transition-shadow duration-150 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 hover:shadow-sm",
           selected.length > 0 ? "text-slate-700" : "text-slate-400",
@@ -371,25 +506,6 @@ export function MultiSelect({
         )}
       >
         <span className="flex-1 truncate">{label}</span>
-        {selected.length > 0 && (
-          <span
-            role="button"
-            tabIndex={0}
-            onClick={(e) => {
-              e.stopPropagation();
-              onChange([]);
-            }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onChange([]);
-              }
-            }}
-            className="flex cursor-pointer items-center justify-center rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-          >
-            <IconX className="size-3.5" />
-          </span>
-        )}
         <svg
           className="size-4 shrink-0 text-slate-400 transition-transform duration-200"
           style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
@@ -408,7 +524,7 @@ export function MultiSelect({
           <div
             ref={menuRef}
             role="listbox"
-            className="z-50 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
+            className="z-[9999] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
             style={{
               position: "fixed",
               top: coords.top,
@@ -476,146 +592,6 @@ export function MultiSelect({
   );
 }
 
-export function Select({
-  className,
-  children,
-  value,
-  defaultValue,
-  onChange,
-  ...props
-}: React.SelectHTMLAttributes<HTMLSelectElement>) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
-  const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
-  const [internalValue, setInternalValue] = useState(defaultValue ?? "");
-
-  const options = useMemo(
-    () =>
-      React.Children.toArray(children).filter(
-        (
-          c,
-        ): c is React.ReactElement<
-          React.OptionHTMLAttributes<HTMLOptionElement>
-        > => React.isValidElement(c) && c.type === "option",
-      ),
-    [children],
-  );
-  const activeValue = value ?? internalValue;
-  const label = useMemo(
-    () => options.find((o) => o.props.value === activeValue)?.props.children ?? activeValue,
-    [options, activeValue],
-  );
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node) && !menuRef.current?.contains(e.target as Node))
-        setOpen(false);
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
-
-  useEffect(() => {
-    if (!open || !buttonRef.current) return;
-    const rect = buttonRef.current.getBoundingClientRect();
-    setCoords({ top: rect.bottom + 6, left: rect.left, width: rect.width });
-  }, [open]);
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        ref={buttonRef}
-        type="button"
-        onClick={() => setOpen(!open)}
-        className={cn(
-          "relative flex h-10 w-full items-center rounded-xl border border-slate-200 bg-white px-3 pr-10 text-left text-sm text-slate-700 outline-none transition-shadow duration-150 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 hover:shadow-sm",
-          className,
-        )}
-        id={props.id}
-        name={props.name}
-        disabled={props.disabled}
-        aria-label={props["aria-label"]}
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        <span className="flex-1 truncate">{label}</span>
-        <svg
-          className="absolute right-3 size-4 shrink-0 text-slate-400 transition-transform duration-200"
-          style={{ transform: open ? "rotate(180deg)" : "rotate(0deg)" }}
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <path d="m6 9 6 6 6-6" />
-        </svg>
-      </button>
-      {open &&
-        createPortal(
-          <div
-            ref={menuRef}
-            role="listbox"
-            className="z-50 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
-            style={{
-              position: "fixed",
-              top: coords.top,
-              left: coords.left,
-              width: coords.width,
-              animation: "fade-in 0.12s ease-out",
-            }}
-          >
-            {options.map((opt) => {
-              const optValue = opt.props.value ?? String(opt.props.children);
-              const isSelected = opt.props.value === activeValue;
-              return (
-                <button
-                  key={String(optValue)}
-                  type="button"
-                  role="option"
-                  aria-selected={isSelected}
-                  className={cn(
-                    "flex w-full items-center px-3 py-2.5 text-left text-sm transition-colors duration-100 hover:bg-slate-50",
-                    isSelected
-                      ? "bg-orange-50 font-medium text-orange-700"
-                      : "text-slate-600",
-                  )}
-                  onClick={() => {
-                    const newVal = opt.props.value ?? String(opt.props.children);
-                    if (value === undefined) setInternalValue(newVal);
-                    const target = { value: newVal } as HTMLSelectElement;
-                    onChange?.({ target, currentTarget: target } as React.ChangeEvent<HTMLSelectElement>);
-                    setOpen(false);
-                  }}
-                >
-                  <span className="flex-1">{opt.props.children}</span>
-                  {isSelected && (
-                    <svg
-                      className="size-4 shrink-0 text-orange-500"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M20 6 9 17l-5-5" />
-                    </svg>
-                  )}
-                </button>
-              );
-            })}
-          </div>,
-          document.body,
-        )}
-    </div>
-  );
-}
-
 export function Textarea(
   props: React.TextareaHTMLAttributes<HTMLTextAreaElement>,
 ) {
@@ -662,6 +638,7 @@ export function Dialog({
   children,
   open,
   onOpenChange,
+  onInteractOutside,
 }: {
   trigger?: React.ReactNode;
   title: string;
@@ -669,6 +646,7 @@ export function Dialog({
   children: React.ReactNode;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  onInteractOutside?: (event: Event) => void;
 }) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -677,7 +655,10 @@ export function Dialog({
       ) : null}
       <DialogPrimitive.Portal>
         <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-[2px] data-[state=open]:animate-in" />
-        <DialogPrimitive.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl outline-none">
+        <DialogPrimitive.Content
+          className="fixed left-1/2 top-1/2 z-50 max-h-[90vh] w-[calc(100%-2rem)] max-w-2xl -translate-x-1/2 -translate-y-1/2 overflow-auto rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl outline-none"
+          onInteractOutside={onInteractOutside}
+        >
           <DialogPrimitive.Title className="text-lg font-semibold text-slate-950">
             {title}
           </DialogPrimitive.Title>

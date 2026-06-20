@@ -33,8 +33,11 @@ const completionConfig = {
   progress: { label: "Complete", color: "#f97316" },
 } satisfies ChartConfig;
 
-export function CompletionChart() {
-  const data: { name: string; progress: number }[] = [];
+export function CompletionChart({ projects }: { projects?: { name: string; progress: number }[] }) {
+  const source = projects ?? [];
+  const data = source.length
+    ? source.filter((p) => p.progress !== undefined).map((p) => ({ name: p.name, progress: p.progress }))
+    : [{ name: "No data", progress: 0 }];
   return (
     <ChartContainer config={completionConfig} className="h-64">
       <BarChart data={data} layout="vertical" margin={{ left: 8, right: 12 }} accessibilityLayer>
@@ -161,8 +164,8 @@ export function TaskStatusChart({ tasks }: { tasks?: OperationsTask[] }) {
         <Pie data={data} dataKey="count" nameKey="status" innerRadius={62} outerRadius={90} paddingAngle={3} stroke="transparent" label={PieSegmentLabel} labelLine={false} {...animationProps}>
           {data.map((item) => <Cell key={item.status} fill={item.fill} />)}
         </Pie>
-        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-slate-950 text-3xl font-bold">{complete}</text>
-        <text x="50%" y="58%" textAnchor="middle" dominantBaseline="middle" className="fill-slate-400 text-[11px]">completed</text>
+        <text x="50%" y="41%" textAnchor="middle" dominantBaseline="middle" className="fill-slate-950 text-3xl font-bold">{complete}</text>
+        <text x="50%" y="49%" textAnchor="middle" dominantBaseline="middle" className="fill-slate-400 text-[11px]">completed</text>
         <Legend verticalAlign="bottom" content={() => <ChartLegendContent keys={["locked", "ready", "active", "blocked", "regressed", "complete", "failed"]} />} />
       </PieChart>
     </ChartContainer>

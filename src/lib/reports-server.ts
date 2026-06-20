@@ -10,7 +10,7 @@ export async function getSiteReports(): Promise<SiteReport[]> {
     id: String(row.id),
     projectId: String(row.project_id),
     title: String(row.title),
-    type: String(row.type) as SiteReport["type"],
+    type: String(row.report_type) as SiteReport["type"],
     description: String(row.description ?? ""),
     status: String(row.status) as SiteReport["status"],
     createdBy: String(row.created_by),
@@ -19,19 +19,17 @@ export async function getSiteReports(): Promise<SiteReport[]> {
   }));
 }
 
-export async function createSiteReport(input: Omit<SiteReport, "id" | "createdAt">): Promise<SiteReport> {
-  const id = `sr${Date.now()}`;
-  const createdAt = new Date().toLocaleDateString();
+export async function createSiteReport(input: Omit<SiteReport, "id" | "createdAt"> & { creatorName?: string }): Promise<SiteReport> {
   const { data, error } = await getSupabaseAdmin()
     .from("site_reports").insert({
-      id, project_id: input.projectId, title: input.title, type: input.type,
+      project_id: input.projectId, title: input.title, report_type: input.type,
       description: input.description, status: input.status, created_by: input.createdBy,
-      created_at: createdAt, attachments: input.attachments,
+      creator_name: input.creatorName ?? "", attachments: input.attachments,
     }).select("*").single();
   if (error) throw new Error(error.message);
   return {
     id: String(data.id), projectId: String(data.project_id), title: String(data.title),
-    type: String(data.type) as SiteReport["type"], description: String(data.description ?? ""),
+    type: String(data.report_type) as SiteReport["type"], description: String(data.description ?? ""),
     status: String(data.status) as SiteReport["status"], createdBy: String(data.created_by),
     createdAt: String(data.created_at),
     attachments: Array.isArray(data.attachments) ? (data.attachments as string[]).map(String) : [],
@@ -41,14 +39,17 @@ export async function createSiteReport(input: Omit<SiteReport, "id" | "createdAt
 export async function updateSiteReport(id: string, input: Partial<SiteReport>): Promise<SiteReport> {
   const updates: Record<string, unknown> = {};
   if (input.title !== undefined) updates.title = input.title;
+  if (input.projectId !== undefined) updates.project_id = input.projectId;
+  if (input.type !== undefined) updates.report_type = input.type;
   if (input.status !== undefined) updates.status = input.status;
   if (input.description !== undefined) updates.description = input.description;
+  if (input.attachments !== undefined) updates.attachments = input.attachments;
   const { data, error } = await getSupabaseAdmin()
     .from("site_reports").update(updates).eq("id", id).select("*").single();
   if (error) throw new Error(error.message);
   return {
     id: String(data.id), projectId: String(data.project_id), title: String(data.title),
-    type: String(data.type) as SiteReport["type"], description: String(data.description ?? ""),
+    type: String(data.report_type) as SiteReport["type"], description: String(data.description ?? ""),
     status: String(data.status) as SiteReport["status"], createdBy: String(data.created_by),
     createdAt: String(data.created_at),
     attachments: Array.isArray(data.attachments) ? (data.attachments as string[]).map(String) : [],

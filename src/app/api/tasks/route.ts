@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   const body = await request.json();
   if (!body.projectId || !body.title?.trim()) return NextResponse.json({ error: "projectId and title required" }, { status: 400 });
   const { data, error } = await getSupabaseAdmin().from("task_commands").insert({
-    command_type: "task.create", project_id: body.projectId, payload: body,     requested_by: session.user.name || session.user.email,
+    command_type: "task.create", project_id: body.projectId, payload: body, requested_by: session.user.id,
   }).select("id,status").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ commandId: data.id, status: data.status }, { status: 202 });

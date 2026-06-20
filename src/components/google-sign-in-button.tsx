@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { signInSocial } from "@/lib/auth-client";
 
-export function GoogleSignInButton() {
+export function GoogleSignInButton({ compact = false }: { compact?: boolean }) {
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSignIn = async () => {
@@ -19,7 +19,7 @@ export function GoogleSignInButton() {
     <button
       onClick={handleSignIn}
       disabled={isLoading}
-      className="flex h-12 w-full max-w-sm items-center justify-center gap-3 rounded-lg border border-zinc-300 bg-white px-6 text-sm font-medium text-zinc-700 shadow-sm transition-all hover:bg-zinc-50 hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+      className={`flex h-11 w-full items-center justify-center gap-3 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-700 shadow-sm transition-all hover:bg-slate-50 hover:shadow-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 ${compact ? "px-0" : "px-4"}`}
     >
       {isLoading ? (
         <svg
@@ -62,7 +62,7 @@ export function GoogleSignInButton() {
           />
         </svg>
       )}
-      {isLoading ? "Signing in..." : "Sign in with Google"}
+      {!compact && (isLoading ? "Signing in..." : "Sign in with Google")}
     </button>
   );
 }

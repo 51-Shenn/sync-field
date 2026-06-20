@@ -39,9 +39,9 @@ const emptyWorker = (): Omit<TeamMember, "id"> => ({
 });
 
 export function WorkforceView() {
-  const { projects } = useProjects();
-  const { teamMembers } = useTeamMembers();
-  const [members] = useState(teamMembers);
+  const { projects, loading: projectsLoading } = useProjects();
+  const { teamMembers, loading: membersLoading } = useTeamMembers();
+  const loading = projectsLoading || membersLoading;
   const [query, setQuery] = useState("");
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
@@ -52,7 +52,14 @@ export function WorkforceView() {
   const [viewMode, setViewMode] = useState<"cards" | "orgchart">("cards");
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const roles = [...new Set(members.map((m) => m.role))];
+  function clearAllFilters() {
+    setQuery("");
+    setSelectedRoles([]);
+    setSelectedProjects([]);
+    setStatusFilter("all");
+  }
+
+  const roles = [...new Set(teamMembers.map((m) => m.role))];
   const roleOptions = useMemo(
     () => roles.map((r) => ({ value: r, label: r })),
     [roles],
@@ -64,7 +71,7 @@ export function WorkforceView() {
 
   const filtered = useMemo(
     () =>
-      members.filter(
+      teamMembers.filter(
         (m) =>
           (selectedRoles.length === 0 || selectedRoles.includes(m.role)) &&
           (selectedProjects.length === 0 ||
@@ -72,12 +79,12 @@ export function WorkforceView() {
           (statusFilter === "all" || m.status === statusFilter) &&
           `${m.name} ${m.role}`.toLowerCase().includes(query.toLowerCase()),
       ),
-    [query, selectedRoles, selectedProjects, statusFilter, members],
+    [query, selectedRoles, selectedProjects, statusFilter, teamMembers],
   );
 
   const orgChartData = useMemo<OrgChartNode[]>(() => {
     const matchingIds = new Set(
-      members
+      teamMembers
         .filter(
           (m) =>
             (selectedRoles.length === 0 || selectedRoles.includes(m.role)) &&
@@ -89,27 +96,49 @@ export function WorkforceView() {
         .map((m) => m.id),
     );
 
+    const toNode = (m: TeamMember) => ({
+      id: m.id,
+      parentId: m.managerId ?? null,
+      name: m.name,
+      role: m.role,
+      email: m.email,
+      phone: m.phone,
+      status: m.status,
+      avatarUrl: m.avatarUrl,
+      projectIds: m.projectIds,
+    });
+
+    const build = (items: TeamMember[]) => {
+      const nodes = items.map(toNode);
+      const roots = nodes.filter((n) => n.parentId === null);
+      if (roots.length <= 1) return nodes;
+      const rootId = "__org_root__";
+      nodes.push({
+        id: rootId,
+        parentId: null,
+        name: "Organization",
+        role: "",
+        email: "",
+        phone: "",
+        status: "active",
+        avatarUrl: "",
+        projectIds: [],
+      });
+      roots.forEach((r) => (r.parentId = rootId));
+      return nodes;
+    };
+
     if (
       selectedRoles.length === 0 &&
       selectedProjects.length === 0 &&
       statusFilter === "all" &&
       !query
     ) {
-      return members.map((m) => ({
-        id: m.id,
-        parentId: m.managerId ?? null,
-        name: m.name,
-        role: m.role,
-        email: m.email,
-        phone: m.phone,
-        status: m.status,
-        avatarUrl: m.avatarUrl,
-        projectIds: m.projectIds,
-      }));
+      return build(teamMembers);
     }
 
     const includeIds = new Set(matchingIds);
-    const memberMap = new Map(members.map((m) => [m.id, m]));
+    const memberMap = new Map(teamMembers.map((m) => [m.id, m]));
     matchingIds.forEach((id) => {
       let current = memberMap.get(id);
       while (current?.managerId) {
@@ -118,26 +147,20 @@ export function WorkforceView() {
       }
     });
 
-    return members
-      .filter((m) => includeIds.has(m.id))
-      .map((m) => ({
-        id: m.id,
-        parentId: m.managerId ?? null,
-        name: m.name,
-        role: m.role,
-        email: m.email,
-        phone: m.phone,
-        status: m.status,
-        avatarUrl: m.avatarUrl,
-        projectIds: m.projectIds,
-      }));
-  }, [members, query, selectedRoles, selectedProjects, statusFilter]);
+    return build(teamMembers.filter((m) => includeIds.has(m.id)));
+  }, [teamMembers, query, selectedRoles, selectedProjects, statusFilter]);
 
   function resetForm() {
     setForm(emptyWorker());
     setEditMember(null);
     setEditing(false);
     setDialogOpen(false);
+  }
+  function openAdd() {
+    setForm(emptyWorker());
+    setEditMember(null);
+    setEditing(false);
+    setDialogOpen(true);
   }
   function openEdit(member: TeamMember) {
     setEditMember(member);
@@ -161,7 +184,7 @@ export function WorkforceView() {
   }
 
   function handleOrgNodeClick(node: OrgChartNode) {
-    const member = members.find((m) => m.id === node.id);
+    const member = teamMembers.find((m) => m.id === node.id);
     if (member) openEdit(member);
   }
 
@@ -171,96 +194,107 @@ export function WorkforceView() {
     { value: "on_leave", label: "On leave" },
   ];
 
+  if (loading) return <Card className="p-16 text-center text-sm text-slate-500">Loading workforce data…</Card>;
+
   return (
     <>
-      <div className="flex flex-col gap-3 mb-5">
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <div className="relative flex-1">
-            <IconSearch className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-            <Input
-              className="pl-9"
-              placeholder="Search workers by name or role..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            {query && (
-              <button
-                type="button"
-                onClick={() => setQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-              >
-                <IconX className="size-4" />
-              </button>
-            )}
-          </div>
-          <Dialog
-            trigger={
-              <Button>
-                <IconPlus className="size-4" />
-                Add worker
-              </Button>
+      <div className="flex flex-wrap items-center gap-3 mb-5 xl:flex-nowrap">
+        <div className="relative min-w-[180px] flex-1 sm:w-[200px]">
+          <IconSearch className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            className="pl-9" 
+            placeholder="Search workers..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            >
+              <IconX className="size-4" />
+            </button>
+          )}
+        </div>
+        <MultiSelect
+          options={roleOptions}
+          selected={selectedRoles}
+          onChange={setSelectedRoles}
+          placeholder="All Roles"
+          className="sm:min-w-[150px]"
+        />
+        <MultiSelect
+          options={projectOptions}
+          selected={selectedProjects}
+          onChange={setSelectedProjects}
+          placeholder="All Projects"
+          className="sm:min-w-[170px]"
+        />
+        <Select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="!w-[140px] shrink-0"
+        >
+          {statusOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </Select>
+        {(query || selectedRoles.length > 0 || selectedProjects.length > 0 || statusFilter !== "all") && (
+          <Button variant="ghost" onClick={clearAllFilters}>
+            <IconX className="size-4" />Clear
+          </Button>
+        )}
+        <div className="flex rounded-lg border border-slate-200 p-1">
+          <Button
+            onClick={() => setViewMode("cards")}
+            variant={viewMode === "cards" ? "secondary" : "ghost"}
+            size="icon"
+            className="size-8"
+            title="Cards"
+          >
+            <IconLayoutGrid className="size-6" />
+          </Button>
+          <Button
+            onClick={() => setViewMode("orgchart")}
+            variant={viewMode === "orgchart" ? "secondary" : "ghost"}
+            size="icon"
+            className="size-8"
+            title="Organization Chart"
+          >
+            <IconHierarchy className="size-6" />
+          </Button>
+        </div>
+        <Button onClick={openAdd}>
+          <IconPlus className="size-4" />
+          Add worker
+        </Button>
+        <Dialog
+          open={dialogOpen}
+          onOpenChange={(o) => {
+            setDialogOpen(o);
+            if (!o) resetForm();
+          }}
+          title={editing ? "Edit Worker Profile" : "Add worker profile"}
+          description={editing ? "Update worker details." : "Enter worker details and project assignments."}
+          onInteractOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('[role="listbox"]') || target.closest('[role="option"]')) {
+              e.preventDefault();
             }
-            title="Add worker profile"
-            description="Enter worker details and project assignments."
-          >
-            <WorkerForm
-              form={form}
-              setForm={setForm}
-              onSave={saveWorker}
-              onCancel={resetForm}
-              editing={false}
-              projectOptions={projectOptions}
-            />
-          </Dialog>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <MultiSelect
-            options={roleOptions}
-            selected={selectedRoles}
-            onChange={setSelectedRoles}
-            placeholder="All Roles"
-            className="sm:min-w-[180px]"
+          }}
+        >
+          <WorkerForm
+            form={form}
+            setForm={setForm}
+            onSave={saveWorker}
+            onCancel={resetForm}
+            editing={false}
+            projectOptions={projectOptions}
           />
-          <MultiSelect
-            options={projectOptions}
-            selected={selectedProjects}
-            onChange={setSelectedProjects}
-            placeholder="All Projects"
-            className="sm:min-w-[200px]"
-          />
-          <Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="sm:min-w-[150px]"
-          >
-            {statusOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
-          <div className="flex rounded-lg border border-slate-200 p-1">
-            <Button
-              onClick={() => setViewMode("cards")}
-              variant={viewMode === "cards" ? "secondary" : "ghost"}
-              size="icon"
-              className="size-8"
-              title="Cards"
-            >
-              <IconLayoutGrid className="size-6" />
-            </Button>
-            <Button
-              onClick={() => setViewMode("orgchart")}
-              variant={viewMode === "orgchart" ? "secondary" : "ghost"}
-              size="icon"
-              className="size-8"
-              title="Organization Chart"
-            >
-              <IconHierarchy className="size-6" />
-            </Button>
-          </div>
-        </div>
+        </Dialog>
       </div>
 
       {viewMode === "orgchart" ? (
@@ -343,24 +377,6 @@ export function WorkforceView() {
         </div>
       )}
 
-      <Dialog
-        open={dialogOpen}
-        onOpenChange={(o) => {
-          setDialogOpen(o);
-          if (!o) resetForm();
-        }}
-        title="Edit Worker Profile"
-        description="Update worker details."
-      >
-        <WorkerForm
-          form={form}
-          setForm={setForm}
-          onSave={saveWorker}
-          onCancel={resetForm}
-          editing={!!editMember}
-          projectOptions={projectOptions}
-        />
-      </Dialog>
     </>
   );
 }
@@ -394,7 +410,7 @@ function WorkerForm({
           <Input
             value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })}
-            placeholder="Full name"
+            placeholder="Full Name"
           />
         </div>
         <div>
@@ -420,7 +436,7 @@ function WorkerForm({
         <Input
           value={form.phone}
           onChange={(e) => setForm({ ...form, phone: e.target.value })}
-          placeholder="(555) 000-0000"
+          placeholder="+601234567890"
         />
       </div>
       <div>
@@ -439,13 +455,23 @@ function WorkerForm({
         </Select>
       </div>
       <div>
-        <Label>Assign to project(s)</Label>
-        <MultiSelect
-          options={projectOptions}
-          selected={form.projectIds}
-          onChange={(ids) => setForm({ ...form, projectIds: ids })}
-          placeholder="Select projects..."
-        />
+        <Label>Assign to project</Label>
+        <Select
+          value={form.projectIds[0] ?? ""}
+          onChange={(e) =>
+            setForm({
+              ...form,
+              projectIds: e.target.value ? [e.target.value] : [],
+            })
+          }
+        >
+          <option value="">Unassigned</option>
+          {projectOptions.map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.label}
+            </option>
+          ))}
+        </Select>
       </div>
       <div className="flex justify-end gap-2">
         <Button variant="outline" type="button" onClick={onCancel}>

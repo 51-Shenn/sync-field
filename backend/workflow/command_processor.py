@@ -1,12 +1,10 @@
 import asyncio
-import re
+import threading
 from datetime import datetime
 from uuid import uuid4
 
 from backend.workflow.dag_engine.dag_engine import SyncFieldDAG
 from backend.workflow.template_guesser import TemplateGuesser
-
-_UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.IGNORECASE)
 
 
 DATETIME_FIELDS = ("blocked_since", "scheduled_start", "deadline", "earliest_start")
@@ -35,6 +33,26 @@ class CommandProcessor:
         self.dispatcher = dispatcher
         self.solver = solver
         self.sb = sb_client
+        # Serializes command execution: multiple Realtime INSERT events each spawn
+        # a drain thread, and they share one mutable DAG engine. Without this lock a
+        # transition can run on a stale graph before a create's reload lands
+        # ("Task ... not found").
+        self._lock = threading.Lock()
+
+    def _ensure_engine_task(self, task_id: str) -> None:
+        """Guarantee the in-memory graph has the task before mutating it. Reloads
+        once from the DB to absorb a just-committed create; raises a clear error
+        only if it genuinely does not exist."""
+        if task_id in self.dispatcher.engine.tasks:
+            return
+        self.reload_graph()
+        if task_id not in self.dispatcher.engine.tasks:
+            raise ValueError(f"Task {task_id} not found")
+
+    def _valid_assignee(self, value):
+        """assigned_to is a uuid FK to technicians; drop anything that is not a
+        known technician (dashboard actor ids, 'llm', stale ids)."""
+        return value if value in self.solver.technicians else None
 
     def reload_graph(self) -> None:
         rows = self.sb.table("tasks").select("*").execute().data or []
@@ -85,14 +103,16 @@ class CommandProcessor:
         }).eq("id", command_id).execute()
 
     def drain(self) -> None:
-        while True:
-            command = self._claim()
-            if not command:
-                return
-            try:
-                self._finish(command["id"], self.execute(command))
-            except Exception as error:
-                self._fail(command["id"], error)
+        # One drainer at a time. Concurrent drains corrupt the shared engine.
+        with self._lock:
+            while True:
+                command = self._claim()
+                if not command:
+                    return
+                try:
+                    self._finish(command["id"], self.execute(command))
+                except Exception as error:
+                    self._fail(command["id"], error)
 
     def execute(self, command: dict) -> dict:
         command_type = command["command_type"]
@@ -109,7 +129,7 @@ class CommandProcessor:
                 "task_name": payload.get("title") or "Untitled task",
                 "state": payload.get("state") or "LOCKED",
                 "dependencies": payload.get("dependencies") or [],
-                "assigned_to": payload.get("assigneeId") or None,
+                "assigned_to": self._valid_assignee(payload.get("assigneeId")),
                 "deadline": payload.get("deadline") or None,
                 "priority": payload.get("priority") or "medium",
                 "estimated_duration_hours": payload.get("estimatedDurationHours") or 2,
@@ -143,33 +163,13 @@ class CommandProcessor:
         if command_type == "task.transition":
             if not task_id:
                 raise ValueError("taskId is required")
+            self._ensure_engine_task(task_id)
             target = str(payload.get("state") or "")
-            technician_id = payload.get("technicianId") or (actor if _UUID_RE.match(str(actor)) else None)
-
-            if target == "READY":
-                task = self.dispatcher.engine.tasks.get(task_id)
-                if task:
-                    deps = task.get("dependencies", [])
-                    unmet = [d for d in deps if self.dispatcher.engine.tasks.get(d, {}).get("state") != "COMPLETE"]
-                    if unmet:
-                        raise ValueError(f"Cannot set READY: dependencies not complete: {unmet}")
-
+            technician_id = payload.get("technicianId") or actor
             if target == "ACTIVE":
-                if technician_id:
-                    return self.dispatcher.process_start_report(task_id, technician_id)
-                events = self.dispatcher.engine.update_task_state(
-                    task_id, target, f"Dashboard command by {actor}"
-                )
-                self.dispatcher._sync(events)
-                return {"task_id": task_id, "events_triggered": len(events)}
+                return self.dispatcher.process_start_report(task_id, technician_id)
             if target == "COMPLETE":
-                if technician_id:
-                    return self.dispatcher.process_completion_report(task_id, technician_id)
-                events = self.dispatcher.engine.update_task_state(
-                    task_id, target, f"Dashboard command by {actor}"
-                )
-                self.dispatcher._sync(events)
-                return {"task_id": task_id, "events_triggered": len(events)}
+                return self.dispatcher.process_completion_report(task_id, technician_id)
             if target == "BLOCKED":
                 return self.dispatcher.process_failure_report(
                     task_id, payload.get("failureType") or "SITE_NOT_READY", technician_id
@@ -183,7 +183,8 @@ class CommandProcessor:
         if command_type == "task.assign":
             if not task_id:
                 raise ValueError("taskId is required")
-            technician_id = payload.get("technicianId") or None
+            self._ensure_engine_task(task_id)
+            technician_id = self._valid_assignee(payload.get("technicianId"))
             self.dispatcher.engine.tasks[task_id]["assigned_to"] = technician_id
             self.dispatcher.persist_tasks([task_id])
             return {"taskId": task_id, "technicianId": technician_id}
@@ -193,14 +194,6 @@ class CommandProcessor:
             if not technician_id:
                 raise ValueError("technicianId is required")
             return self.dispatcher.handle_absence(technician_id)
-
-        if command_type == "reassignment.execute":
-            approval_id = payload.get("approval_id")
-            if not approval_id:
-                raise ValueError("approval_id is required")
-            approved = bool(payload.get("approved", False))
-            task_id = command.get("task_id") or ""
-            return self.dispatcher.execute_pending_reassignment(approval_id, task_id, approved)
 
         if command_type == "project.delete":
             if not project_id:

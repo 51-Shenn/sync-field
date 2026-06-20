@@ -18,14 +18,21 @@ export function useProjects(): { projects: Project[]; loading: boolean } {
   return { projects, loading };
 }
 
-export function useTeamMembers(): { teamMembers: TeamMember[]; loading: boolean } {
-  const { snapshot, loading } = useOperations();
+export function useTeamMembers() {
+  const { snapshot, loading, createTechnician, updateTechnician, deleteTechnician } = useOperations();
   const teamMembers: TeamMember[] = snapshot.technicians.map((t) => ({
-    id: t.id, name: t.name, role: t.role, email: "", phone: t.phone,
+    id: t.id, name: t.name, role: t.role, email: t.email, phone: t.phone,
     avatarUrl: "", status: t.status === "active" ? "active" : "on_leave",
-    projectIds: [], managerId: undefined,
+    projectIds: t.projectIds, managerId: t.managerId ?? undefined,
   }));
-  return { teamMembers, loading };
+  // Normalize managerId to null so JSON.stringify keeps it (undefined is dropped),
+  // letting the API clear a worker's manager when "No manager" is selected.
+  const createWorker = (input: Omit<TeamMember, "id">) =>
+    createTechnician({ ...input, managerId: input.managerId ?? null });
+  const updateWorker = (id: string, input: Omit<TeamMember, "id">) =>
+    updateTechnician(id, { ...input, managerId: input.managerId ?? null });
+  const deleteWorker = (id: string) => deleteTechnician(id);
+  return { teamMembers, loading, createWorker, updateWorker, deleteWorker };
 }
 
 async function fetchJson(url: string) {
@@ -44,18 +51,25 @@ export function useDocuments() {
 export function useSiteReports() {
   const [reports, setReports] = useState<SiteReport[]>([]);
   const [loading, setLoading] = useState(true);
-  const refresh = useCallback(async () => {
-    const data = await fetchJson("/api/reports");
-    setReports(data);
-  }, []);
-  useEffect(() => { refresh().finally(() => setLoading(false)); }, [refresh]);
+  useEffect(() => { fetchJson("/api/reports").then(setReports).catch(() => {}).finally(() => setLoading(false)); }, []);
   const createReport = useCallback(async (input: Omit<SiteReport, "id" | "createdAt">) => {
     const res = await fetch("/api/reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
     if (!res.ok) throw new Error("Failed to create report");
     const created = await res.json();
     setReports((prev) => [created, ...prev]);
   }, []);
-  return { reports, loading, createReport };
+  const updateReport = useCallback(async (id: string, input: Partial<SiteReport>) => {
+    const res = await fetch(`/api/reports/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
+    if (!res.ok) throw new Error("Failed to update report");
+    const updated = await res.json();
+    setReports((prev) => prev.map((r) => (r.id === id ? updated : r)));
+  }, []);
+  const deleteReport = useCallback(async (id: string) => {
+    const res = await fetch(`/api/reports/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error("Failed to delete report");
+    setReports((prev) => prev.filter((r) => r.id !== id));
+  }, []);
+  return { reports, loading, createReport, updateReport, deleteReport };
 }
 
 export function useAuditLogs() {

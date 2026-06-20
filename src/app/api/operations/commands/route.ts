@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     task_id: body.taskId ?? null,
     project_id: body.projectId ?? null,
     payload: body.payload ?? {},
-    requested_by: session.user.name || session.user.email,
+    requested_by: session.user.id,
   }).select("id,status").single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ commandId: data.id, status: data.status }, { status: 202 });

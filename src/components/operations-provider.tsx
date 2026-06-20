@@ -16,6 +16,9 @@ type OperationsContextValue = {
   createSubtask: (subtask: Record<string, unknown>) => Promise<void>;
   updateSubtask: (id: string, subtask: Record<string, unknown>) => Promise<void>;
   deleteSubtask: (id: string) => Promise<void>;
+  createTechnician: (technician: Record<string, unknown>) => Promise<void>;
+  updateTechnician: (id: string, technician: Record<string, unknown>) => Promise<void>;
+  deleteTechnician: (id: string) => Promise<void>;
 };
 
 const emptySnapshot: OperationsSnapshot = {
@@ -60,7 +63,7 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
     const sb = getSupabaseBrowser();
     if (!sb) return () => { clearTimeout(initialRefresh); clearInterval(pollingFallback); };
     const channel = sb.channel("syncfield-operations");
-    for (const table of ["projects", "tasks", "subtasks", "technicians", "task_events", "alerts", "processed_messages", "task_commands", "reassignment_approvals"]) {
+    for (const table of ["projects", "tasks", "subtasks", "technicians", "task_events", "alerts", "processed_messages", "task_commands"]) {
       channel.on("postgres_changes", { event: "*", schema: "public", table }, scheduleRefresh);
     }
     channel.subscribe((status) => {
@@ -92,6 +95,9 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
     createSubtask: (subtask) => mutate("/api/subtasks", "POST", subtask),
     updateSubtask: (id, subtask) => mutate(`/api/subtasks/${id}`, "PATCH", subtask),
     deleteSubtask: (id) => mutate(`/api/subtasks/${id}`, "DELETE"),
+    createTechnician: (technician) => mutate("/api/technicians", "POST", technician),
+    updateTechnician: (id, technician) => mutate(`/api/technicians/${id}`, "PATCH", technician),
+    deleteTechnician: (id) => mutate(`/api/technicians/${id}`, "DELETE"),
   }), [snapshot, loading, error, refresh, mutate]);
 
   return <OperationsContext.Provider value={value}>{children}</OperationsContext.Provider>;

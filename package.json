@@ -4,9 +4,11 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
+    "postinstall": "prisma generate",
     "lint": "eslint",
+    "verify:operations": "node scripts/verify-operations.mjs",
     "run-sql-file": "dotenv -e .env -- npx supabase db query --linked --file",
     "run-sql": "dotenv -e .env -- npx supabase db query --linked",
     "supabase-link": "npx supabase link --project-ref vjebihxnmapvqdxhpdfy"
@@ -14,16 +16,30 @@
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "@radix-ui/react-avatar": "^1.2.0",
+    "@radix-ui/react-dialog": "^1.1.17",
+    "@radix-ui/react-select": "^2.3.1",
+    "@radix-ui/react-tabs": "^1.1.15",
     "@supabase/supabase-js": "^2.108.2",
+    "@tabler/icons-react": "^3.44.0",
     "better-auth": "^1.6.19",
+    "clsx": "^2.1.1",
+    "d3-org-chart": "^3.1.1",
     "dotenv": "^17.4.2",
+    "lucide-react": "^1.21.0",
+    "jose": "^6.2.3",
     "next": "16.2.6",
     "pg": "^8.22.0",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "recharts": "^3.8.1",
+    "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/d3-selection": "^3.0.11",
+    "@types/d3-transition": "^3.0.9",
+    "@types/d3-zoom": "^3.0.8",
     "@types/node": "^20",
     "@types/pg": "^8.20.0",
     "@types/react": "^19",
@@ -38,3 +54,4 @@
     "typescript": "^5"
   }
 }
+
