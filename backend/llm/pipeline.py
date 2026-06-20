@@ -16,6 +16,11 @@ def get_valid_tasks(sb) -> list[str]:
     return [row["task_name"] for row in result.data]
 
 
+def get_valid_technicians(sb) -> list[str]:
+    result = sb.table("technicians").select("name").execute()
+    return [row["name"] for row in result.data if row.get("name")]
+
+
 def resolve_task_id(sb, task_name: str | None) -> str | None:
     if not task_name:
         return None
@@ -28,6 +33,13 @@ def resolve_technician_id(sb, telegram_id) -> str | None:
         return None
     result = sb.table("technicians").select("id").eq("telegram_id", str(telegram_id)).maybe_single().execute()
     return result.data["id"] if result and result.data else None
+
+
+def resolve_technician_by_name(sb, name: str | None) -> str | None:
+    if not name:
+        return None
+    result = sb.table("technicians").select("id").eq("name", name).limit(1).execute()
+    return result.data[0]["id"] if result and result.data else None
 
 
 def save_original_message(sb, message: dict, telegram_id=None) -> str:
@@ -48,7 +60,8 @@ def process_message(message: dict, telegram_id=None, dispatcher=None) -> dict | 
     original_message_id = save_original_message(sb, message, telegram_id)
 
     valid_tasks = get_valid_tasks(sb)
-    result = llm_analyze(message, valid_tasks)
+    valid_technicians = get_valid_technicians(sb)
+    result = llm_analyze(message, valid_tasks, valid_technicians)
     if result is None:
         return None
 
@@ -67,19 +80,24 @@ def process_message(message: dict, telegram_id=None, dispatcher=None) -> dict | 
 
     task_id = resolve_task_id(sb, result.get("task_name"))
     confidence = CONFIDENCE_MAP.get(result.get("confidence"), 0.5)
+    label = result.get("label")
+    status = result.get("status")
+    d = dispatcher or _dispatcher
 
-    if task_id and confidence == 1.0 and (dispatcher or _dispatcher):
-        label = result.get("label")
-        status = result.get("status")
-        technician_id = resolve_technician_id(sb, telegram_id) or "llm"
-        d = dispatcher or _dispatcher
-
-        if label == "task_completion" and status == "done":
-            d.process_completion_report(task_id, technician_id)
-        elif label == "issue_report" or status == "blocked":
-            failure_type = result.get("note") or "SITE_NOT_READY"
-            d.process_failure_report(task_id, failure_type, technician_id)
-        elif label == "task_start" and status == "in_progress":
-            d.process_start_report(task_id, technician_id)
+    if confidence == 1.0 and d:
+        if label == "absence_report":
+            # Absence keys on the absent technician, not a task — no task_id needed.
+            absent_id = resolve_technician_by_name(sb, result.get("technician_name"))
+            if absent_id:
+                d.handle_absence(absent_id)
+        elif task_id:
+            technician_id = resolve_technician_id(sb, telegram_id) or "llm"
+            if label == "task_completion" and status == "done":
+                d.process_completion_report(task_id, technician_id)
+            elif label == "issue_report" or status == "blocked":
+                failure_type = result.get("note") or "SITE_NOT_READY"
+                d.process_failure_report(task_id, failure_type, technician_id)
+            elif label == "task_start" and status == "in_progress":
+                d.process_start_report(task_id, technician_id)
 
     return result

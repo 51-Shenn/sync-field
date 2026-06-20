@@ -59,6 +59,9 @@ export type OperationsTechnician = {
   role: string;
   skills: string[];
   status: string;
+  email: string;
+  projectIds: string[];
+  managerId: string | null;
   lat: number | null;
   lng: number | null;
 };

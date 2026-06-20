@@ -100,6 +100,8 @@ export async function getOperationsSnapshot(): Promise<OperationsSnapshot> {
   const technicians: OperationsTechnician[] = rows(results[3].data).map((row) => ({
     id: stringValue(row.id), name: stringValue(row.name), phone: stringValue(row.phone), role: stringValue(row.role),
     skills: Array.isArray(row.skills) ? row.skills.map(String) : [], status: stringValue(row.status),
+    email: stringValue(row.email), projectIds: Array.isArray(row.project_ids) ? row.project_ids.map(String) : [],
+    managerId: typeof row.manager_id === "string" ? row.manager_id : null,
     lat: typeof row.lat === "number" ? row.lat : null, lng: typeof row.lng === "number" ? row.lng : null,
   }));
 

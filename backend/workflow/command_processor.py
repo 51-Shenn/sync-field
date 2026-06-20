@@ -1,4 +1,5 @@
 import asyncio
+import threading
 from datetime import datetime
 from uuid import uuid4
 
@@ -32,6 +33,26 @@ class CommandProcessor:
         self.dispatcher = dispatcher
         self.solver = solver
         self.sb = sb_client
+        # Serializes command execution: multiple Realtime INSERT events each spawn
+        # a drain thread, and they share one mutable DAG engine. Without this lock a
+        # transition can run on a stale graph before a create's reload lands
+        # ("Task ... not found").
+        self._lock = threading.Lock()
+
+    def _ensure_engine_task(self, task_id: str) -> None:
+        """Guarantee the in-memory graph has the task before mutating it. Reloads
+        once from the DB to absorb a just-committed create; raises a clear error
+        only if it genuinely does not exist."""
+        if task_id in self.dispatcher.engine.tasks:
+            return
+        self.reload_graph()
+        if task_id not in self.dispatcher.engine.tasks:
+            raise ValueError(f"Task {task_id} not found")
+
+    def _valid_assignee(self, value):
+        """assigned_to is a uuid FK to technicians; drop anything that is not a
+        known technician (dashboard actor ids, 'llm', stale ids)."""
+        return value if value in self.solver.technicians else None
 
     def reload_graph(self) -> None:
         rows = self.sb.table("tasks").select("*").execute().data or []
@@ -82,14 +103,16 @@ class CommandProcessor:
         }).eq("id", command_id).execute()
 
     def drain(self) -> None:
-        while True:
-            command = self._claim()
-            if not command:
-                return
-            try:
-                self._finish(command["id"], self.execute(command))
-            except Exception as error:
-                self._fail(command["id"], error)
+        # One drainer at a time. Concurrent drains corrupt the shared engine.
+        with self._lock:
+            while True:
+                command = self._claim()
+                if not command:
+                    return
+                try:
+                    self._finish(command["id"], self.execute(command))
+                except Exception as error:
+                    self._fail(command["id"], error)
 
     def execute(self, command: dict) -> dict:
         command_type = command["command_type"]
@@ -106,7 +129,7 @@ class CommandProcessor:
                 "task_name": payload.get("title") or "Untitled task",
                 "state": payload.get("state") or "LOCKED",
                 "dependencies": payload.get("dependencies") or [],
-                "assigned_to": payload.get("assigneeId") or None,
+                "assigned_to": self._valid_assignee(payload.get("assigneeId")),
                 "deadline": payload.get("deadline") or None,
                 "priority": payload.get("priority") or "medium",
                 "estimated_duration_hours": payload.get("estimatedDurationHours") or 2,
@@ -140,6 +163,7 @@ class CommandProcessor:
         if command_type == "task.transition":
             if not task_id:
                 raise ValueError("taskId is required")
+            self._ensure_engine_task(task_id)
             target = str(payload.get("state") or "")
             technician_id = payload.get("technicianId") or actor
             if target == "ACTIVE":
@@ -159,7 +183,8 @@ class CommandProcessor:
         if command_type == "task.assign":
             if not task_id:
                 raise ValueError("taskId is required")
-            technician_id = payload.get("technicianId") or None
+            self._ensure_engine_task(task_id)
+            technician_id = self._valid_assignee(payload.get("technicianId"))
             self.dispatcher.engine.tasks[task_id]["assigned_to"] = technician_id
             self.dispatcher.persist_tasks([task_id])
             return {"taskId": task_id, "technicianId": technician_id}

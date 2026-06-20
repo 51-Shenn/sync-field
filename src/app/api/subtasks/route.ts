@@ -7,7 +7,10 @@ export async function POST(request: Request) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await request.json();
   if (!body.taskId || !body.title?.trim()) return NextResponse.json({ error: "taskId and title are required" }, { status: 400 });
-  const { data, error } = await getSupabaseAdmin().from("subtasks").insert({
+  const sb = getSupabaseAdmin();
+  const { data: parent } = await sb.from("tasks").select("id").eq("id", body.taskId).maybeSingle();
+  if (!parent) return NextResponse.json({ error: "Parent task no longer exists" }, { status: 404 });
+  const { data, error } = await sb.from("subtasks").insert({
     task_id: body.taskId, title: body.title.trim(), status: body.status ?? "todo",
     assignee_id: body.assigneeId || null, due_date: body.dueDate || null,
   }).select("*").single();
