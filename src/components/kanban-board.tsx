@@ -35,7 +35,6 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
   const [draft, setDraft] = useState<TaskDraft>(emptyDraft());
   const [subtaskTitle, setSubtaskTitle] = useState<Record<string, string>>({});
   const [message, setMessage] = useState("");
-  const [dismissedFailures, setDismissedFailures] = useState<Set<string>>(new Set());
   const [isSaving, setIsSaving] = useState(false);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const savingRef = useRef(false);
@@ -123,10 +122,8 @@ export function KanbanBoard({ projectId }: { projectId: string }) {
     setDraggedId(null); setActiveColumn(null);
   }
 
-  const recentFailure = snapshot.commands.find((command) => command.status === "failed" && (!command.projectId || command.projectId === projectId) && !dismissedFailures.has(command.id));
-
   return <>
-    {(message || recentFailure) && <div className={cn("mb-4 rounded-lg border px-4 py-3 text-sm", recentFailure ? "border-red-200 bg-red-50 text-red-700" : "border-blue-200 bg-blue-50 text-blue-700")}><span>{recentFailure?.error || message}</span>{recentFailure && <button onClick={() => setDismissedFailures((prev) => new Set(prev).add(recentFailure.id))} className="ml-2 font-semibold hover:underline">Dismiss</button>}</div>}
+    {message && <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">{message}</div>}
     <div className="overflow-x-auto pb-3">
       <div className="grid min-w-[1680px] grid-cols-7 gap-3">
         {taskStates.map((state) => {
