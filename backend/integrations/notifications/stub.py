@@ -35,13 +35,22 @@ class StubNotifier:
             print(f"[Notifier] alert insert failed: {e}")
 
     def _telegram(self, text: str) -> None:
-        # The dispatcher runs in worker threads; hop back onto the bot's event loop.
-        if not (self._tg_client and self._tg_chat and self._loop):
+        if not self._tg_client:
+            print("[Notifier] Telegram skipped — no _tg_client bound")
+            return
+        if not self._tg_chat:
+            print("[Notifier] Telegram skipped — no _tg_chat bound")
+            return
+        if not self._loop:
+            print("[Notifier] Telegram skipped — no _loop bound")
             return
         try:
-            asyncio.run_coroutine_threadsafe(
+            future = asyncio.run_coroutine_threadsafe(
                 self._tg_client.send_message(self._tg_chat, text), self._loop
             )
+            future.add_done_callback(lambda f: (
+                print(f"[Notifier] Telegram send failed: {f.exception()}") if f.exception() else None
+            ))
         except Exception as e:
             print(f"[Notifier] Telegram send failed: {e}")
 
