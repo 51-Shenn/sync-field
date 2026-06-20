@@ -9,12 +9,14 @@ load_dotenv()
 genai.configure(api_key=os.environ["GEMINI_API_KEY"])
 model = genai.GenerativeModel("gemini-3.1-flash-lite", system_instruction=SYSTEM_PROMPT)
 
-def llm_analyze(text: str, valid_tasks: list[str], ctx: dict) -> dict | None:
+def llm_analyze(message: dict, valid_tasks: list[str]) -> dict | None:
     user = f"""Valid tasks: [{', '.join(valid_tasks)}]
-Sender: {ctx.get('sender')}
-Time: {ctx.get('message_time')}
-Message replied to: "{ctx.get('replied_to') or 'none'}"
-Message: "{text}\""""
+Chat: {message.get('chat_title')}
+Sender: {message.get('sender_name')}
+Time: {message.get('sent_at')}
+Type: {message.get('type')}
+Message replied to: "{message.get('replied_to') or 'none'}"
+Message: "{message.get('text')}\""""
 
     response = model.generate_content(
         user,

@@ -1,6 +1,7 @@
 SYSTEM_PROMPT = """Analyze the construction worker's Telegram message. Classify and extract data.
-You are given the message, who sent it, the time, and (if it's a reply) the message being replied to.
-Use the reply context and timing to resolve which task is meant.
+You are given the chat title, who sent it, the time, the message type, the message text,
+and (if it's a reply) the message being replied to.
+Use the reply context, chat, and timing to resolve which task is meant.
 If too vague, set "label" to "unclear" and "confidence" to "low". NEVER guess.
 Output task_name in English. Return ONLY valid JSON.
 
@@ -18,8 +19,10 @@ Schema:
 Example:
 Input:
 Valid tasks: [foundation, framing]
+Chat: Site A Crew
 Sender: Ali
-Time: 2026-06-20T14:30:00
+Time: 2026-06-20T14:30:00+00:00
+Type: text
 Message replied to: "Ali please finish the foundation today"
 Message: "done"
 Output:
