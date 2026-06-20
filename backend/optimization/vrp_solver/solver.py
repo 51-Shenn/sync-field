@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass
-from typing import Dict, List, Set, Union
+from typing import Dict, List, Set, Tuple, Union
 from ortools.sat.python import cp_model
 
 
@@ -26,21 +26,24 @@ class VRPSolver:
             return 0.0
         return math.sqrt((t_lat - task_lat) ** 2 + (t_lng - task_lng) ** 2)
 
-    def _is_eligible(self, tech: dict, task: dict, now_hour: float) -> bool:
+    def _is_eligible(self, tech: dict, task: dict, now_hour: float) -> Tuple[bool, str]:
         required = set(task.get("required_skills", []))
-        if required and not required.issubset(set(tech.get("skills", []))):
-            return False
+        tech_skills = set(tech.get("skills", []))
+        if required and not required.issubset(tech_skills):
+            missing = required - tech_skills
+            return False, f"skills_missing: {missing}"
 
         for item, qty in task.get("required_materials_qty", {}).items():
-            if tech.get("van_inventory", {}).get(item, 0) < qty:
-                return False
+            available = tech.get("van_inventory", {}).get(item, 0)
+            if available < qty:
+                return False, f"insufficient_{item}: need {qty}, have {available}"
 
         duration = task.get("estimated_duration_hours", 2)
         shift_end = tech.get("shift_end_hour", 18)
         if now_hour + duration > shift_end:
-            return False
+            return False, f"shift_overrun: need {duration}h, {shift_end - now_hour}h left"
 
-        return True
+        return True, "eligible"
 
     def solve_reassignment(
         self, idle_technician_ids: List[str], exclude_tasks: Set[str], now_hour: float = 9.0
@@ -61,7 +64,8 @@ class VRPSolver:
             if tech is None:
                 continue
             for task_id, task in ready_tasks.items():
-                if self._is_eligible(tech, task, now_hour):
+                eligible, _ = self._is_eligible(tech, task, now_hour)
+                if eligible:
                     x[(tech_id, task_id)] = model.NewBoolVar(f"x_{tech_id}_{task_id}")
 
         if not x:

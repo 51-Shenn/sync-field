@@ -1,4 +1,3 @@
-import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import Dict, List, Set, Callable, Union
@@ -11,19 +10,64 @@ FAILURE_CATEGORIES = {
     "QUALITY":   ["BLUR", "WRONG_ANGLE", "DEFECTIVE_UNIT"],
 }
 
-CATEGORY_TO_ROLE = {
-    "RESOURCE":  "procurement_lead",
-    "SITE":      "project_manager",
-    "TECHNICAL": "network_specialist",
-    "QUALITY":   "site_supervisor",
+@dataclass
+class FailurePolicy:
+    category: str
+    escalate_to_role: str
+    max_local_retries: int = 0
+    urgency_weight: float = 5.0
+
+
+DEFAULT_POLICIES: dict[str, FailurePolicy] = {
+    "RESOURCE":  FailurePolicy("RESOURCE",  "procurement_lead",   max_local_retries=0, urgency_weight=8.0),
+    "SITE":      FailurePolicy("SITE",      "project_manager",    max_local_retries=0, urgency_weight=10.0),
+    "TECHNICAL": FailurePolicy("TECHNICAL", "network_specialist", max_local_retries=1, urgency_weight=15.0),
+    "QUALITY":   FailurePolicy("QUALITY",   "site_supervisor",    max_local_retries=0, urgency_weight=5.0),
 }
 
-CATEGORY_URGENCY_WEIGHT = {
-    "TECHNICAL": 15.0,
-    "SITE":      10.0,
-    "RESOURCE":   8.0,
-    "QUALITY":    5.0,
-}
+
+@dataclass
+class AvailabilityWindow:
+    start: datetime
+    end: datetime
+    source: str
+    confirmed: bool = True
+
+
+class TechnicianSchedule:
+    def __init__(self, windows: List[AvailabilityWindow]):
+        self.windows = sorted(windows, key=lambda w: w.start)
+
+    def next_available_slot(self, after: datetime, duration: timedelta) -> tuple:
+        for w in self.windows:
+            if w.end <= after:
+                continue
+            slot_start = max(after, w.start)
+            if slot_start + duration <= w.end:
+                confidence = "EXACT" if w.confirmed else "ESTIMATED"
+                return slot_start, confidence
+        return None, "UNKNOWN"
+
+    def remove_window(self, start: datetime, end: datetime, source: str = "unavailable") -> None:
+        new_windows = []
+        for w in self.windows:
+            if w.end <= start or w.start >= end:
+                new_windows.append(w)
+            else:
+                if w.start < start:
+                    new_windows.append(AvailabilityWindow(w.start, start, w.source, w.confirmed))
+                if w.end > end:
+                    new_windows.append(AvailabilityWindow(end, w.end, w.source, w.confirmed))
+        self.windows = sorted(new_windows, key=lambda w: w.start)
+
+    def delay_from(self, when: datetime, by: timedelta, confirmed: bool = False) -> None:
+        new_windows = []
+        for w in self.windows:
+            if w.start >= when:
+                new_windows.append(AvailabilityWindow(w.start + by, w.end + by, w.source, confirmed))
+            else:
+                new_windows.append(w)
+        self.windows = new_windows
 
 # Define the explicit physical-world state space
 VALID_STATES = {
@@ -47,6 +91,8 @@ VALID_MANUAL_TRANSITIONS = {
     "FAILED":    set(),
 }
 
+MAX_CASCADE_DEPTH = 20
+
 @dataclass
 class TaskPriority:
     task_id: str
@@ -55,6 +101,12 @@ class TaskPriority:
     days_to_deadline: Union[float, None]
     hours_blocked: float
     failure_category: Union[str, None]
+    granularity: str = "ESTIMATE"
+    data_sources_used: List[str] = None
+
+    def __post_init__(self):
+        if self.data_sources_used is None:
+            self.data_sources_used = []
 
 
 class SyncFieldDAG:
@@ -69,6 +121,9 @@ class SyncFieldDAG:
             task.setdefault("assigned_to", None)
             task.setdefault("scheduled_start", None)
             task.setdefault("created_at_epoch", datetime.now().timestamp())
+            task.setdefault("resolution_eta", None)
+            task.setdefault("earliest_start", None)
+            task.setdefault("eta_confidence", "UNKNOWN")
 
         self.children_map: Dict[str, List[str]] = {t_id: [] for t_id in self.tasks}
         for t_id, task in self.tasks.items():
@@ -115,6 +170,112 @@ class SyncFieldDAG:
             })
 
         return affected
+    def compute_cascade_eta(self, blocked_task_id: str, schedules: dict = None) -> dict:
+        """
+        Propagates time impact downstream from a blocked node.
+        Confidence degrades: EXACT → ESTIMATED → UNKNOWN.
+        Optionally consults technician schedules for realistic start times.
+        """
+        descendants = self.get_descendants(blocked_task_id)
+        order = [blocked_task_id]
+        queue = [blocked_task_id]
+        while queue:
+            current = queue.pop(0)
+            for child in self.children_map.get(current, []):
+                if child in descendants and child not in order:
+                    order.append(child)
+                    queue.append(child)
+
+        results: dict = {}
+
+        for t_id in order:
+            task = self.tasks[t_id]
+            deps = task.get("dependencies", [])
+            duration = timedelta(hours=task.get("estimated_duration_hours", 2))
+
+            if t_id == blocked_task_id:
+                if task.get("resolution_eta"):
+                    results[t_id] = {
+                        "earliest_start": task["resolution_eta"],
+                        "earliest_finish": task["resolution_eta"] + duration,
+                        "eta_confidence": task.get("eta_confidence", "EXACT"),
+                    }
+                    task["earliest_start"] = task["resolution_eta"]
+                    task["eta_confidence"] = task.get("eta_confidence", "EXACT")
+                else:
+                    results[t_id] = {
+                        "earliest_start": None,
+                        "earliest_finish": None,
+                        "eta_confidence": "UNKNOWN",
+                        "reason": "Blocked task has no resolution ETA",
+                    }
+                    task["earliest_start"] = None
+                    task["eta_confidence"] = "UNKNOWN"
+                continue
+
+            upstream_etas: list = []
+            for dep in deps:
+                dep_task = self.tasks[dep]
+                if dep_task["state"] == "COMPLETE":
+                    upstream_etas.append(("EXACT", datetime.now()))
+                elif dep_task.get("resolution_eta"):
+                    dep_duration = dep_task.get("estimated_duration_hours", 2)
+                    dep_finish = dep_task["resolution_eta"] + timedelta(hours=dep_duration)
+                    upstream_etas.append((
+                        dep_task.get("eta_confidence", "ESTIMATED"),
+                        dep_finish,
+                    ))
+                else:
+                    upstream_etas.append(("UNKNOWN", None))
+
+            any_unknown = any(conf == "UNKNOWN" for conf, _ in upstream_etas) if upstream_etas else False
+            any_estimated = any(conf == "ESTIMATED" for conf, _ in upstream_etas) if upstream_etas else False
+
+            if any_unknown or not upstream_etas:
+                results[t_id] = {
+                    "earliest_start": None,
+                    "earliest_finish": None,
+                    "eta_confidence": "UNKNOWN",
+                    "reason": "Upstream resolution time not available" if any_unknown else "No dependency data",
+                }
+                task["earliest_start"] = None
+                task["eta_confidence"] = "UNKNOWN"
+                continue
+
+            latest_upstream = max(eta for _, eta in upstream_etas if eta is not None)
+            assigned_tech = task.get("assigned_to")
+
+            if schedules and assigned_tech and assigned_tech in schedules:
+                slot_start, slot_conf = schedules[assigned_tech].next_available_slot(latest_upstream, duration)
+                if slot_start is None:
+                    results[t_id] = {
+                        "earliest_start": None,
+                        "earliest_finish": None,
+                        "eta_confidence": "UNKNOWN",
+                        "reason": f"{assigned_tech} has no available slot for {duration} from {latest_upstream}",
+                    }
+                    task["earliest_start"] = None
+                    task["eta_confidence"] = "UNKNOWN"
+                    continue
+                earliest_start = slot_start
+                effective_estimated = any_estimated or slot_conf == "ESTIMATED"
+            else:
+                earliest_start = latest_upstream
+                effective_estimated = any_estimated
+
+            earliest_finish = earliest_start + duration
+            confidence = "ESTIMATED" if effective_estimated else "EXACT"
+
+            results[t_id] = {
+                "earliest_start": earliest_start,
+                "earliest_finish": earliest_finish,
+                "eta_confidence": confidence,
+            }
+            task["earliest_start"] = earliest_start
+            task["eta_confidence"] = confidence
+            task["resolution_eta"] = earliest_start
+
+        return results
 
     def register_precondition_hook(self, task_id: str, hook: Callable[[dict], bool]) -> None:
         """Injects domain rules (e.g., inventory, site safety) into the generic engine."""
@@ -122,13 +283,21 @@ class SyncFieldDAG:
             self._precondition_hooks[task_id] = []
         self._precondition_hooks[task_id].append(hook)
 
-    def evaluate_graph(self) -> List[dict]:
+    def evaluate_graph(self, depth: int = 0, dirty: set = None) -> List[dict]:
         """
         Maintains structural integrity by checking dependency states and hooks.
         System cascades bypass the manual transition rules to enforce physical constraints.
+        Only READY tasks are re-locked — ACTIVE/BLOCKED/REGRESSED are protected.
         """
+        if depth >= MAX_CASCADE_DEPTH:
+            return []
+
+        candidates = dirty if dirty is not None else self.tasks.keys()
         changes = []
-        for t_id, task in self.tasks.items():
+        next_dirty = set()
+
+        for t_id in candidates:
+            task = self.tasks[t_id]
             current_state = task["state"]
 
             dependencies_met = all(
@@ -147,28 +316,46 @@ class SyncFieldDAG:
                         "task_id": t_id,
                         "old_state": "LOCKED",
                         "new_state": "READY",
+                        "depth": depth,
                         "reason": "Dependencies and preconditions met"
                     })
+                    next_dirty.update(self.children_map.get(t_id, []))
             else:
-                if current_state in ["READY", "ACTIVE"]:
+                if current_state == "READY":
                     task["state"] = "LOCKED"
                     changes.append({
                         "task_id": t_id,
-                        "old_state": current_state,
+                        "old_state": "READY",
                         "new_state": "LOCKED",
+                        "depth": depth,
                         "reason": "Prerequisites/preconditions no longer met"
                     })
+                    next_dirty.update(self.children_map.get(t_id, []))
+                elif current_state == "BLOCKED":
+                    task["state"] = "LOCKED"
+                    if "blocked_since" in task:
+                        del task["blocked_since"]
+                    changes.append({
+                        "task_id": t_id,
+                        "old_state": "BLOCKED",
+                        "new_state": "LOCKED",
+                        "depth": depth,
+                        "reason": "Prerequisites no longer met — cleared block"
+                    })
+                    next_dirty.update(self.children_map.get(t_id, []))
                 elif current_state == "COMPLETE":
                     task["state"] = "REGRESSED"
                     changes.append({
                         "task_id": t_id,
                         "old_state": "COMPLETE",
                         "new_state": "REGRESSED",
+                        "depth": depth,
                         "reason": "Upstream dependency failed"
                     })
+                    next_dirty.update(self.children_map.get(t_id, []))
 
         if changes:
-            changes.extend(self.evaluate_graph())
+            changes.extend(self.evaluate_graph(depth + 1, dirty=next_dirty))
 
         return changes
 
@@ -199,8 +386,8 @@ class SyncFieldDAG:
 
         print(f"\n\u26a1 State Transition: [{task_id}] manually updated {old_state} \u279e {new_state} ({context})")
 
-        events = [{"task_id": task_id, "old_state": old_state, "new_state": new_state, "reason": "Manual operator update"}]
-        cascade_events = self.evaluate_graph()
+        events = [{"task_id": task_id, "old_state": old_state, "new_state": new_state, "depth": 0, "reason": context or "Manual operator update"}]
+        cascade_events = self.evaluate_graph(depth=0)
         events.extend(cascade_events)
 
         return events
@@ -209,11 +396,13 @@ class SyncFieldDAG:
         """Calculates a multi-factor priority score to guide allocation decisions."""
         task = self.tasks[task_id]
         score = 0.0
+        data_sources: List[str] = []
 
         # Factor 1: Critical path length
         descendants = self.get_descendants(task_id)
         critical_path_score = len(descendants) * 10.0
         score += critical_path_score
+        data_sources.append("dag_topology")
 
         # Factor 2: Time pressure / Deadline proximity
         deadline_score = 0.0
@@ -222,10 +411,13 @@ class SyncFieldDAG:
             days_left = (task["deadline"] - datetime.now()).total_seconds() / 86400.0
             deadline_score = max(0.0, (7.0 - days_left) * 5.0)
             score += deadline_score
+            data_sources.append("deadline")
 
         # Factor 3: Resource contention (shared tooling)
         contention_score = 8.0 if task.get("requires_shared_tool") else 0.0
         score += contention_score
+        if task.get("requires_shared_tool"):
+            data_sources.append("inventory")
 
         # Factor 4: Blocker age
         hours_blocked = 0.0
@@ -234,15 +426,21 @@ class SyncFieldDAG:
             hours_blocked = (datetime.now() - task["blocked_since"]).total_seconds() / 3600.0
             blocker_score = hours_blocked * 2.0
             score += blocker_score
+            data_sources.append("blocked_since")
 
         # Factor 5: Chronological tiebreaker
         tiebreaker = 1.0 / (task.get("created_at_epoch", 1.0))
         score += tiebreaker
+        data_sources.append("created_at")
 
         # Factor 6: Failure category urgency weight
         category = task.get("failure_category")
-        category_weight = CATEGORY_URGENCY_WEIGHT.get(category, 0.0) if category else 0.0
+        category_weight = DEFAULT_POLICIES[category].urgency_weight if category and category in DEFAULT_POLICIES else 0.0
         score += category_weight
+        if category:
+            data_sources.append("failure_category")
+
+        granularity = "DETAILED" if "deadline" in task and "estimated_duration_hours" in task else "ESTIMATE"
 
         return TaskPriority(
             task_id=task_id,
@@ -251,6 +449,8 @@ class SyncFieldDAG:
             days_to_deadline=round(days_left, 1) if days_left is not None else None,
             hours_blocked=round(hours_blocked, 1),
             failure_category=category,
+            granularity=granularity,
+            data_sources_used=data_sources,
         )
 
     def print_state(self):
@@ -263,32 +463,55 @@ class SyncFieldDAG:
         print("-" * 80)
 
     def sync_to_supabase(self, events: List[dict], sb_client) -> None:
+        if not events:
+            return
+
+        seen_tasks: dict = {}
         for event in events:
-            task_id = event["task_id"]
-            self.sync_task_to_supabase(task_id, event, sb_client)
-            self.sync_task_event_to_supabase(event, sb_client)
-            time.sleep(0.05)
+            seen_tasks[event["task_id"]] = event
 
-    def sync_task_to_supabase(self, task_id: str, event: dict, sb_client) -> None:
-        task = self.tasks[task_id]
-        sb_client.table("tasks").update({
-            "state": event["new_state"],
-            "failure_category": task.get("failure_category"),
-            "attempt_count": task.get("attempt_count", 0),
-            "updated_at": "now()",
-        }).eq("id", task_id).execute()
+        task_upserts = []
+        for task_id, event in seen_tasks.items():
+            task = self.tasks[task_id]
+            earliest = task.get("earliest_start")
+            task_upserts.append({
+                "id": task_id,
+                "state": event["new_state"],
+                "failure_category": task.get("failure_category"),
+                "attempt_count": task.get("attempt_count", 0),
+                "earliest_start": earliest.isoformat() if earliest else None,
+                "eta_confidence": task.get("eta_confidence", "UNKNOWN"),
+                "updated_at": "now()",
+            })
 
-    def sync_task_event_to_supabase(self, event: dict, sb_client) -> None:
-        sb_client.table("task_events").insert({
-            "task_id": event["task_id"],
-            "old_state": event["old_state"],
-            "new_state": event["new_state"],
-            "reason": event["reason"],
-            "triggered_by": "cascade" if event["reason"] != "Manual operator update" else "manual",
-        }).execute()
+        event_inserts = [{
+            "task_id": e["task_id"],
+            "old_state": e["old_state"],
+            "new_state": e["new_state"],
+            "reason": e["reason"],
+            "triggered_by": self._triggered_by(e),
+            "depth": e.get("depth", 0),
+        } for e in events]
+
+        if task_upserts:
+            sb_client.table("tasks").upsert(task_upserts).execute()
+        if event_inserts:
+            sb_client.table("task_events").insert(event_inserts).execute()
+
+    @staticmethod
+    def _triggered_by(event: dict) -> str:
+        reason = event.get("reason", "")
+        if "Dependencies and preconditions met" in reason:
+            return "system"
+        if reason == "Manual operator update":
+            return "manual"
+        return "cascade"
 
 
 class FieldOpsDomainRules:
+    def __init__(self, policies: dict[str, FailurePolicy] = None):
+        self.policies = policies or DEFAULT_POLICIES
+
     @staticmethod
     def find_failure_category(failure_type: str) -> str:
         for category, types in FAILURE_CATEGORIES.items():
@@ -296,32 +519,31 @@ class FieldOpsDomainRules:
                 return category
         raise ValueError(f"Unknown failure type: {failure_type}")
 
-    @classmethod
-    def handle_task_failure(cls, engine: SyncFieldDAG, task_id: str, failure_type: str, technician_id: str) -> dict:
+    def handle_task_failure(self, engine: SyncFieldDAG, task_id: str, failure_type: str, technician_id: str) -> dict:
         task = engine.tasks[task_id]
-        category = cls.find_failure_category(failure_type)
+        category = self.find_failure_category(failure_type)
+        policy = self.policies.get(category)
+        if not policy:
+            raise ValueError(f"No policy for failure category: {category}")
+
         task["failure_category"] = category
         task["attempt_count"] += 1
-
         attempt = task["attempt_count"]
 
-        if category == "TECHNICAL" and attempt < 2:
-            engine.update_task_state(task_id, "BLOCKED", f"Local retry {attempt} for {failure_type}")
+        if attempt <= policy.max_local_retries:
+            engine.update_task_state(task_id, "BLOCKED", f"Local retry {attempt}/{policy.max_local_retries} for {failure_type}")
             return {
                 "action": "RETRY_LOCAL",
                 "assignee": technician_id,
-                "msg": f"Technical issue ({failure_type}). Retrying task locally. Attempt {attempt}/2."
+                "msg": f"Technical issue ({failure_type}). Retrying task locally. Attempt {attempt}/{policy.max_local_retries}."
             }
         else:
-            target_role = CATEGORY_TO_ROLE[category]
-            engine.update_task_state(task_id, "BLOCKED", f"Escalated to {target_role} due to {failure_type}")
-
+            engine.update_task_state(task_id, "BLOCKED", f"Escalated to {policy.escalate_to_role} due to {failure_type}")
             affected_techs = engine.get_affected_technicians(task_id)
-
             return {
                 "action": "ESCALATE",
                 "assigned_to": technician_id,
-                "escalate_to_role": target_role,
+                "escalate_to_role": policy.escalate_to_role,
                 "affected_technicians": affected_techs,
-                "msg": f"Escalated {failure_type} to {target_role}. Blocked downstream path contains {len(affected_techs)} staff."
+                "msg": f"Escalated {failure_type} to {policy.escalate_to_role}. Blocked downstream path contains {len(affected_techs)} staff."
             }
