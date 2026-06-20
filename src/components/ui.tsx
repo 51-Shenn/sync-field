@@ -286,7 +286,7 @@ export function DropdownContent({
       <SelectPrimitive.Content
         position="popper"
         sideOffset={4}
-        className="z-50 max-h-56 min-w-[8rem] overflow-hidden rounded-lg border border-slate-200 bg-white p-1 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+        className="z-50 max-h-72 min-w-[8rem] overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
         {...props}
       >
         {children}
@@ -560,12 +560,13 @@ export function Select({
           <div
             ref={menuRef}
             role="listbox"
-            className="z-50 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
+            className="z-50 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg"
             style={{
               position: "fixed",
               top: coords.top,
               left: coords.left,
               width: coords.width,
+              maxHeight: 280,
               animation: "fade-in 0.12s ease-out",
             }}
           >
