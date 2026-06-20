@@ -59,16 +59,34 @@ create table if not exists tasks (
   updated_at timestamptz default now()
 );
 
--- Messages (Tier 1/2/3 resolution audit trail)
-create table if not exists messages (
+-- Original messages (raw, exactly what came in from Telegram, before any LLM analysis)
+create table if not exists original_messages (
   id uuid primary key default gen_random_uuid(),
+  telegram_id text,
+  sender_name text,
+  chat_title text,
+  sent_at timestamptz,
+  type text,
+  text text not null,
+  replied_to text,
+  created_at timestamptz default now()
+);
+
+-- Processed messages (Tier 1/2/3 resolution audit trail — the LLM's classification of one original_messages row)
+create table if not exists processed_messages (
+  id uuid primary key default gen_random_uuid(),
+  original_message_id uuid references original_messages(id) on delete cascade,
   technician_id uuid references technicians(id),
   task_id text references tasks(id),
-  raw_text text not null,
+  label text,
+  status text,
+  material text,
+  quantity numeric,
   resolved_state text,
   resolved_failure_type text,
   tier_resolved text,
   confidence numeric,
+  note text,
   created_at timestamptz default now()
 );
 
@@ -127,6 +145,12 @@ begin
   ) then
     alter publication supabase_realtime add table alerts;
   end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and tablename = 'processed_messages'
+  ) then
+    alter publication supabase_realtime add table processed_messages;
+  end if;
 end $$;
 
 -- ============================================
@@ -137,3 +161,6 @@ create index if not exists idx_tasks_state on tasks(state);
 create index if not exists idx_task_events_task_id on task_events(task_id);
 create index if not exists idx_task_events_created_at on task_events(created_at desc);
 create index if not exists idx_alerts_status on alerts(status);
+create index if not exists idx_original_messages_created_at on original_messages(created_at desc);
+create index if not exists idx_processed_messages_original_message_id on processed_messages(original_message_id);
+create index if not exists idx_processed_messages_task_id on processed_messages(task_id);

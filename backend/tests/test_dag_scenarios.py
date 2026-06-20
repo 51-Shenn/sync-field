@@ -1,7 +1,8 @@
-from backend.workflow.dag_engine.dag_engine import SyncFieldDAG, FieldOpsDomainRules
-from backend.optimization.vrp_solver.solver import VRPSolver, Assignment
+from backend.workflow.dag_engine.dag_engine import SyncFieldDAG
+from backend.optimization.vrp_solver.solver import VRPSolver
 from backend.integrations.notifications.stub import StubNotifier
 from backend.workflow.event_handlers.dispatcher import FieldOpsDispatcher
+from backend.workflow.parser.parser import FieldOpsParser
 from datetime import datetime, timedelta
 
 if __name__ == "__main__":
@@ -119,3 +120,167 @@ if __name__ == "__main__":
     for t_id, t in sorted(engine.tasks.items()):
         if t.get("assigned_to") or t["state"] != "LOCKED":
             print(f"  {t_id}: state={t['state']}, assigned_to={t.get('assigned_to', '-')}")
+
+    # --- SCENARIO 3: Absence Handling ---
+    print("\n\n=== SCENARIO 3: Technician Absence ===")
+    fresh_tasks = [{**t, "state": "LOCKED", "assigned_to": None, "attempt_count": 0, "failure_category": None} for t in all_tasks]
+    engine2 = SyncFieldDAG(fresh_tasks)
+    engine2.tasks["T01"]["assigned_to"] = "Ahmad_Wireman"
+    engine2.update_task_state("T01", "ACTIVE", "Ahmad starts work")
+    engine2.tasks["S01"]["assigned_to"] = "Mei_Ling_Cabler"
+    engine2.update_task_state("S01", "ACTIVE", "Mei Ling pulling cable")
+
+    solver2 = VRPSolver(engine2, technicians_db)
+    notifier2 = StubNotifier()
+    dispatcher2 = FieldOpsDispatcher(engine2, solver2, notifier2)
+
+    result = dispatcher2.handle_absence("Ahmad_Wireman")
+    print(f"\nFreed tasks: {result['freed_tasks']}")
+    print(f"Reassignments: {result['assignments']}")
+    print(f"T01 state: {engine2.tasks['T01']['state']}, assigned_to: {engine2.tasks['T01'].get('assigned_to')}")
+
+    assert engine2.tasks["T01"]["state"] == "READY", f"Expected READY, got {engine2.tasks['T01']['state']}"
+    assert engine2.tasks["T01"].get("assigned_to") != "Ahmad_Wireman", "T01 should not still have Ahmad as assignee after absence"
+    assert engine2.tasks["S01"].get("assigned_to") == "Mei_Ling_Cabler", "S01 should still be with Mei Ling"
+
+    # --- SCENARIO 4: Parser (3-Tier) ---
+    print("\n\n=== SCENARIO 4: Parser ===")
+    parser = FieldOpsParser()
+
+    # Tier 1: JSON
+    r1 = parser.parse('{"task_id": "T03", "failure_type": "MATERIAL_MISSING", "technician_id": "Ahmad"}', "dummy")
+    assert r1.tier == 1, f"Expected tier 1, got tier {r1.tier}"
+    assert r1.task_id == "T03"
+    assert r1.failure_type == "MATERIAL_MISSING"
+    print(f"Tier 1 (JSON): {r1}")
+
+    # Tier 1: Command
+    r2 = parser.parse("report T03 MATERIAL_MISSING by Ahmad", "dummy")
+    assert r2.tier == 1, f"Expected tier 1, got tier {r2.tier}"
+    assert r2.failure_type == "MATERIAL_MISSING"
+    print(f"Tier 1 (Command): {r2}")
+
+    # Tier 2: Keyword
+    r3 = parser.parse("T03 cannot proceed because no material available at site", "Ahmad")
+    assert r3.tier == 2, f"Expected tier 2, got tier {r3.tier}"
+    assert r3.failure_type == "MATERIAL_MISSING"
+    print(f"Tier 2 (Keyword): {r3}")
+
+    # Tier 2: active_task_id fallback — single-word msg with no task ID
+    r3b = parser.parse("Koyak.", technician_id="Din", active_task_id="T03")
+    assert r3b.tier == 2, f"Expected tier 2, got tier {r3b.tier}"
+    assert r3b.task_id == "T03", f"Expected T03 from active_task_id, got {r3b.task_id}"
+    assert r3b.failure_type == "TOOL_MISSING"
+    print(f"Tier 2 (active_task_id fallback): {r3b}")
+
+    # Tier 2: Manglish — Patah
+    r_ml1 = parser.parse("T05 drill patah", "Zul")
+    assert r_ml1.tier == 2, f"Expected tier 2, got tier {r_ml1.tier}"
+    assert r_ml1.failure_type == "TOOL_DAMAGED"
+    print(f"Tier 2 (Manglish - Patah): {r_ml1}")
+
+    # Tier 2: Manglish — Blank
+    r_ml2 = parser.parse("T06 cable tester blank no pulse", "Haziq")
+    assert r_ml2.tier == 2
+    assert r_ml2.failure_type == "TEST_FAILED"
+    print(f"Tier 2 (Manglish - Blank): {r_ml2}")
+
+    # Tier 2: Manglish — Takleh login
+    r_ml3 = parser.parse("T07 takleh login ip crash", "Zul")
+    assert r_ml3.tier == 2
+    assert r_ml3.failure_type == "IP_CONFLICT"
+    print(f"Tier 2 (Manglish - Takleh login): {r_ml3}")
+
+    # Tier 2: Manglish — stok kosong
+    r_ml4 = parser.parse("T03 stok kosong, habis", "Ahmad")
+    assert r_ml4.tier == 2
+    assert r_ml4.failure_type == "MATERIAL_MISSING"
+    print(f"Tier 2 (Manglish - Habis): {r_ml4}")
+
+    # Tier 2: Malay
+    r4 = parser.parse("T04 tool rosak, drill not working", "Ravi")
+    assert r4.tier == 2, f"Expected tier 2, got tier {r4.tier}"
+    assert r4.failure_type == "TOOL_DAMAGED"
+    print(f"Tier 2 (Malay): {r4}")
+
+    # Tier 3: LLM stub
+    r5 = parser.parse("something completely ambiguous and unparsable", "Zul")
+    assert r5.tier == 3, f"Expected tier 3, got tier {r5.tier}"
+    print(f"Tier 3 (LLM stub): {r5}")
+
+    # --- SCENARIO 5: Cascade ETA with 3 Confidence Levels ---
+    print("\n\n=== SCENARIO 5: Cascade ETA Propagation ===")
+    eta_tasks = [{**t, "state": "LOCKED", "assigned_to": None, "attempt_count": 0, "failure_category": None} for t in all_tasks]
+    engine5 = SyncFieldDAG(eta_tasks)
+
+    engine5.update_task_state("T01", "ACTIVE")
+    engine5.update_task_state("T01", "COMPLETE")
+    engine5.update_task_state("T02", "ACTIVE")
+    engine5.update_task_state("T02", "COMPLETE")
+    engine5.update_task_state("T03", "ACTIVE")
+    engine5.tasks["T03"]["blocked_since"] = datetime.now()
+    engine5.update_task_state("T03", "BLOCKED", "material missing")
+
+    # Case A: No resolution ETA → all UNKNOWN
+    eta_a = engine5.compute_cascade_eta("T03")
+    print("\nCase A: No resolution ETA set")
+    for t_id in ["T03", "T04", "T05", "T06", "T07", "T08"]:
+        conf = eta_a[t_id]["eta_confidence"]
+        print(f"  {t_id}: confidence={conf}")
+        assert conf == "UNKNOWN", f"Expected UNKNOWN for {t_id}, got {conf}"
+
+    # Case B: Set T03 resolution_eta → all EXACT
+    tomorrow_9am = datetime.now() + timedelta(days=1)
+    tomorrow_9am = tomorrow_9am.replace(hour=9, minute=0, second=0, microsecond=0)
+    engine5.tasks["T03"]["resolution_eta"] = tomorrow_9am
+    engine5.tasks["T03"]["eta_confidence"] = "EXACT"
+
+    eta_b = engine5.compute_cascade_eta("T03")
+    print("\nCase B: T03 resolution_eta = tomorrow 9am (EXACT)")
+    for t_id in ["T03", "T04", "T05", "T06", "T07", "T08"]:
+        start = eta_b[t_id]["earliest_start"]
+        conf = eta_b[t_id]["eta_confidence"]
+        print(f"  {t_id}: confidence={conf}, start={start.strftime('%d %b %H:%M') if start else 'None'}")
+        assert conf == "EXACT", f"Expected EXACT for {t_id}, got {conf}"
+        assert start is not None, f"Expected start time for {t_id}"
+
+    # T04 and T05 are parallel children of T03
+    t03_duration = engine5.tasks["T03"]["estimated_duration_hours"]
+    expected_t04_start = tomorrow_9am + timedelta(hours=t03_duration)
+    assert eta_b["T04"]["earliest_start"] == expected_t04_start
+    assert eta_b["T05"]["earliest_start"] == expected_t04_start
+
+    # T06 depends on both T04 and T05
+    t04_duration = engine5.tasks["T04"]["estimated_duration_hours"]
+    t05_duration = engine5.tasks["T05"]["estimated_duration_hours"]
+    latest_t04_t05 = max(t04_duration, t05_duration)
+    expected_t06_start = expected_t04_start + timedelta(hours=latest_t04_t05)
+    assert eta_b["T06"]["earliest_start"] == expected_t06_start
+
+    print("\n  Cascade timing verified: T04/T05 start = T03 finish, T06 starts after max(T04, T05)")
+
+    # Case C: All deps COMPLETE → must not falsely return UNKNOWN
+    fresh2 = [{**t, "state": "LOCKED", "assigned_to": None, "attempt_count": 0, "failure_category": None} for t in all_tasks]
+    engine5c = SyncFieldDAG(fresh2)
+    engine5c.update_task_state("T01", "ACTIVE")
+    engine5c.update_task_state("T01", "COMPLETE")
+    engine5c.update_task_state("T02", "ACTIVE")
+    engine5c.update_task_state("T02", "COMPLETE")
+    engine5c.tasks["T03"]["resolution_eta"] = datetime.now()
+    engine5c.tasks["T03"]["eta_confidence"] = "EXACT"
+
+    eta_c = engine5c.compute_cascade_eta("T03")
+    print("\nCase C: T03 blocked, T01/T02 COMPLETE (all deps done)")
+    for t_id in ["T03", "T04", "T05", "T06", "T07", "T08"]:
+        conf = eta_c[t_id]["eta_confidence"]
+        start = eta_c[t_id].get("earliest_start")
+        print(f"  {t_id}: confidence={conf}" + (f", start={start.strftime('%d %b %H:%M')}" if start else ", start=None"))
+
+    assert eta_c["T03"]["eta_confidence"] == "EXACT", f"T03 should be EXACT, got {eta_c['T03']['eta_confidence']}"
+    assert eta_c["T04"]["eta_confidence"] == "EXACT", f"T04 with all deps COMPLETE must be EXACT, got {eta_c['T04']['eta_confidence']}"
+    assert eta_c["T05"]["eta_confidence"] == "EXACT", f"T05 with all deps COMPLETE must be EXACT, got {eta_c['T05']['eta_confidence']}"
+    print("\n  Regression verified: all-COMPLETE dep set resolves to EXACT, not UNKNOWN")
+
+    print("\n" + "=" * 60)
+    print("ALL SCENARIOS PASSED")
+    print("=" * 60)

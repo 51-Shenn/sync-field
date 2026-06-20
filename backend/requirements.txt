@@ -9,3 +9,4 @@ Pillow>=11,<12
 comtypes>=1,<2
 supabase>=2.0,<3
 ortools>=9.15,<10
+openai>=1.0,<3
