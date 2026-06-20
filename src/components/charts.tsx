@@ -23,7 +23,6 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from "@/components/chart";
-import { projects, tasks as mockTasks } from "@/lib/mock-data";
 import type { OperationsProject, OperationsTask } from "@/lib/operations-types";
 
 const axisProps = { axisLine: false, tickLine: false, fontSize: 11 } as const;
@@ -35,7 +34,7 @@ const completionConfig = {
 } satisfies ChartConfig;
 
 export function CompletionChart() {
-  const data = projects.map((project) => ({ name: project.name.split(" ")[0], progress: project.progress }));
+  const data: { name: string; progress: number }[] = [];
   return (
     <ChartContainer config={completionConfig} className="h-64">
       <BarChart data={data} layout="vertical" margin={{ left: 8, right: 12 }} accessibilityLayer>
@@ -147,7 +146,7 @@ function PieSegmentLabel({ cx, cy, midAngle, middleRadius, value }: PieLabelRend
 }
 
 export function TaskStatusChart({ tasks }: { tasks?: OperationsTask[] }) {
-  const source = tasks ?? mockTasks.map((task) => ({ state: task.status === "done" ? "COMPLETE" : task.status === "in_progress" ? "ACTIVE" : task.status === "review" ? "BLOCKED" : "READY" }));
+  const source = tasks ?? [];
   const data = Object.keys(taskConfig).map((status) => ({
     status,
     count: source.filter((task) => task.state.toLowerCase() === status).length,
@@ -162,8 +161,8 @@ export function TaskStatusChart({ tasks }: { tasks?: OperationsTask[] }) {
         <Pie data={data} dataKey="count" nameKey="status" innerRadius={62} outerRadius={90} paddingAngle={3} stroke="transparent" label={PieSegmentLabel} labelLine={false} {...animationProps}>
           {data.map((item) => <Cell key={item.status} fill={item.fill} />)}
         </Pie>
-        <text x="50%" y="45%" textAnchor="middle" dominantBaseline="middle" className="fill-slate-950 text-3xl font-bold">{complete}</text>
-        <text x="50%" y="54%" textAnchor="middle" dominantBaseline="middle" className="fill-slate-400 text-[11px]">completed</text>
+        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="middle" className="fill-slate-950 text-3xl font-bold">{complete}</text>
+        <text x="50%" y="58%" textAnchor="middle" dominantBaseline="middle" className="fill-slate-400 text-[11px]">completed</text>
         <Legend verticalAlign="bottom" content={() => <ChartLegendContent keys={["locked", "ready", "active", "blocked", "regressed", "complete", "failed"]} />} />
       </PieChart>
     </ChartContainer>

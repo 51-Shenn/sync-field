@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import { IconPencil } from "@tabler/icons-react";
-import { teamMembers, type Project } from "@/lib/mock-data";
+import { useTeamMembers } from "@/lib/use-data";
+import type { Project } from "@/lib/project-types";
 import { Button, Dialog, Input, Label, Select, Textarea } from "@/components/ui";
 
 export function EditProjectDialog({ project }: { project: Project }) {
+  const { teamMembers } = useTeamMembers();
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState<Omit<Project, "id">>({
     name: project.name,

@@ -4,11 +4,11 @@ import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconBell, IconBriefcase2, IconChevronDown, IconChevronsLeft, IconChevronsRight, IconGasStation, IconLayoutDashboard, IconLogout, IconMenu2, IconDeviceDesktop, IconSearch, IconSettings, IconUsers, IconX } from "@tabler/icons-react";
+import { IconBell, IconBriefcase2, IconChevronDown, IconChevronsLeft, IconChevronsRight, IconLayoutDashboard, IconLogout, IconMenu2, IconDeviceDesktop, IconSearch, IconSettings, IconUsers, IconX } from "@tabler/icons-react";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { Avatar, Badge, Button, Dialog, Input, Skeleton } from "@/components/ui";
 import { authClient } from "@/lib/auth-client";
-import { projects } from "@/lib/mock-data";
+import { useProjects } from "@/lib/use-data";
 import { cn } from "@/lib/utils";
 
 const nav = [
@@ -16,7 +16,6 @@ const nav = [
   { href:"/sites", label:"Site Reporting", icon:IconDeviceDesktop },
   { href:"/projects", label:"Project Management", icon:IconBriefcase2 },
   { href:"/workforce", label:"Workforce Management", icon:IconUsers },
-  { href:"/resources", label:"Resource Management", icon:IconGasStation },
 ];
 function Brand({ collapsed = false }: { collapsed?: boolean }) {
   return <Link href="/" className="flex h-16 items-center gap-2.5 overflow-hidden px-3">
@@ -87,6 +86,7 @@ export function Sidebar({ collapsed, setCollapsed }: { collapsed: boolean; setCo
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const { projects } = useProjects();
   const [collapsed, setCollapsed] = useState(false);
   const [mobile, setMobile] = useState(false);
   const [search, setSearch] = useState("");
