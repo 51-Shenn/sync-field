@@ -1,3 +1,8 @@
+# Document OCR pipeline
+#   - Detects file type by extension (.pdf, .docx, .pptx)
+#   - Converts DOCX/PPTX → PDF via Microsoft Office COM (comtypes)
+#   - Sends PDFs to Gemini for page-level OCR
+#   - Falls back to native text extraction + image OCR if COM fails
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,6 +31,7 @@ def ocr_image_file(file_path: str) -> str:
 
 
 def convert_to_pdf(input_path: str, output_dir: str) -> str:
+    # Uses Microsoft Word / PowerPoint COM automation (requires Office installed)
     import comtypes.client
     import pythoncom
 
@@ -62,6 +68,7 @@ def convert_to_pdf(input_path: str, output_dir: str) -> str:
 
 
 def _extract_pdf(path: str) -> list[dict]:
+    # Try Gemini PDF OCR first; fall back to per-page PyMuPDF native text + image OCR
     try:
         text = ocr_pdf_file(path)
         if text.strip():
@@ -102,6 +109,7 @@ def _try_gemini_pdf(path: str) -> str | None:
 
 
 def _extract_docx(path: str) -> list[dict]:
+    # Try COM → Gemini PDF OCR; fall back to python-docx native text + embedded image OCR
     text = _try_gemini_pdf(path)
     if text is not None:
         return [{"page": 1, "source": "gemini", "text": text}]
@@ -123,6 +131,7 @@ def _extract_docx(path: str) -> list[dict]:
 
 
 def _extract_pptx(path: str) -> list[dict]:
+    # Try COM → Gemini PDF OCR; fall back to python-pptx text + embedded image OCR
     text = _try_gemini_pdf(path)
     if text is not None:
         return [{"page": 1, "source": "gemini", "text": text}]
@@ -156,6 +165,7 @@ def process_document(
     sent_at: datetime,
     chat_title: str | None = None,
 ) -> dict:
+    # Top-level pipeline: detect type → extract pages → assemble result dict
     path = Path(file_path)
     file_type = detect_file_type(path.name)
 

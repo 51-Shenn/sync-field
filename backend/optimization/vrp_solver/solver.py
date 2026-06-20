@@ -33,13 +33,13 @@ class VRPSolver:
             missing = required - tech_skills
             return False, f"skills_missing: {missing}"
 
-        for item, qty in (task.get("required_materials_qty") or {}).items():
-            available = (tech.get("van_inventory") or {}).get(item, 0)
+        for item, qty in task.get("required_materials_qty", {}).items():
+            available = tech.get("van_inventory", {}).get(item, 0)
             if available < qty:
                 return False, f"insufficient_{item}: need {qty}, have {available}"
 
-        duration = task.get("estimated_duration_hours") or 2
-        shift_end = tech.get("shift_end_hour") or 18
+        duration = task.get("estimated_duration_hours", 2)
+        shift_end = tech.get("shift_end_hour", 18)
         if now_hour + duration > shift_end:
             return False, f"shift_overrun: need {duration}h, {shift_end - now_hour}h left"
 
@@ -96,8 +96,7 @@ class VRPSolver:
             task = ready_tasks[task_id]
             score = self._pair_score(tech_id, task_id, tech, task)
             pair_scores[(tech_id, task_id)] = score
-            weight = int(score * self.OBJECTIVE_SCALE)
-            objective_terms.append(max(1, weight) * var)
+            objective_terms.append(int(score * self.OBJECTIVE_SCALE) * var)
 
         model.Maximize(sum(objective_terms))
 

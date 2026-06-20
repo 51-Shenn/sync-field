@@ -1,3 +1,4 @@
+# Google Gemini OCR client — sends images / PDFs to Gemini 3.1 Flash-Lite
 import mimetypes
 from pathlib import Path
 

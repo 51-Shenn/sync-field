@@ -3,14 +3,16 @@ import os
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from backend.llm.analysis_prompt import SYSTEM_PROMPT
-from backend.llm.validators import validate_output
+from llm.analysis_prompt import SYSTEM_PROMPT
+from llm.validators import validate_output
 
 load_dotenv()
 client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
 
-def llm_analyze(message: dict, valid_tasks: list[str]) -> dict | None:
+def llm_analyze(message: dict, valid_tasks: list[str], valid_technicians: list[str] | None = None) -> dict | None:
+    valid_technicians = valid_technicians or []
     user = f"""Valid tasks: [{', '.join(valid_tasks)}]
+Valid technicians: [{', '.join(valid_technicians)}]
 Chat: {message.get('chat_title')}
 Sender: {message.get('sender_name')}
 Time: {message.get('sent_at')}
@@ -31,4 +33,4 @@ Message: "{message.get('text')}\""""
         data = json.loads(raw)
     except json.JSONDecodeError:
         return None
-    return validate_output(data, valid_tasks)
+    return validate_output(data, valid_tasks, valid_technicians)

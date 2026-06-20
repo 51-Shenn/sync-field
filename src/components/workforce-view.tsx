@@ -36,11 +36,12 @@ const emptyWorker = (): Omit<TeamMember, "id"> => ({
   avatarUrl: "",
   status: "active",
   projectIds: [],
+  managerId: undefined,
 });
 
 export function WorkforceView() {
   const { projects, loading: projectsLoading } = useProjects();
-  const { teamMembers, loading: membersLoading } = useTeamMembers();
+  const { teamMembers, loading: membersLoading, createWorker, updateWorker, deleteWorker: removeWorker } = useTeamMembers();
   const loading = projectsLoading || membersLoading;
   const [query, setQuery] = useState("");
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
@@ -52,6 +53,13 @@ export function WorkforceView() {
   const [viewMode, setViewMode] = useState<"cards" | "orgchart">("cards");
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  function clearAllFilters() {
+    setQuery("");
+    setSelectedRoles([]);
+    setSelectedProjects([]);
+    setStatusFilter("all");
+  }
+
   const roles = [...new Set(teamMembers.map((m) => m.role))];
   const roleOptions = useMemo(
     () => roles.map((r) => ({ value: r, label: r })),
@@ -60,6 +68,10 @@ export function WorkforceView() {
   const projectOptions = useMemo(
     () => projects.map((p) => ({ value: p.id, label: p.name })),
     [projects],
+  );
+  const managerOptions = useMemo(
+    () => teamMembers.map((m) => ({ value: m.id, label: `${m.name} — ${m.role}` })),
+    [teamMembers],
   );
 
   const filtered = useMemo(
@@ -75,23 +87,59 @@ export function WorkforceView() {
     [query, selectedRoles, selectedProjects, statusFilter, teamMembers],
   );
 
+  const ORG_ROOT_ID = "__org_root__";
   const orgChartData = useMemo<OrgChartNode[]>(() => {
-    const matchingIds = new Set(
-      teamMembers
-        .filter(
-          (m) =>
-            (selectedRoles.length === 0 || selectedRoles.includes(m.role)) &&
-            (selectedProjects.length === 0 ||
-              m.projectIds.some((id) => selectedProjects.includes(id))) &&
-            (statusFilter === "all" || m.status === statusFilter) &&
-            `${m.name} ${m.role}`.toLowerCase().includes(query.toLowerCase()),
-        )
-        .map((m) => m.id),
-    );
+    const noFilters =
+      selectedRoles.length === 0 &&
+      selectedProjects.length === 0 &&
+      statusFilter === "all" &&
+      !query;
 
-    const toNode = (m: TeamMember) => ({
+    let visible: TeamMember[];
+    if (noFilters) {
+      visible = teamMembers;
+    } else {
+      const matchingIds = new Set(
+        teamMembers
+          .filter(
+            (m) =>
+              (selectedRoles.length === 0 || selectedRoles.includes(m.role)) &&
+              (selectedProjects.length === 0 ||
+                m.projectIds.some((id) => selectedProjects.includes(id))) &&
+              (statusFilter === "all" || m.status === statusFilter) &&
+              `${m.name} ${m.role}`.toLowerCase().includes(query.toLowerCase()),
+          )
+          .map((m) => m.id),
+      );
+      const includeIds = new Set(matchingIds);
+      const memberMap = new Map(teamMembers.map((m) => [m.id, m]));
+      matchingIds.forEach((id) => {
+        let current = memberMap.get(id);
+        while (current?.managerId) {
+          includeIds.add(current.managerId);
+          current = memberMap.get(current.managerId);
+        }
+      });
+      visible = teamMembers.filter((m) => includeIds.has(m.id));
+    }
+
+    if (visible.length === 0) return [];
+
+    const visibleIds = new Set(visible.map((m) => m.id));
+    const root: OrgChartNode = {
+      id: ORG_ROOT_ID,
+      parentId: null,
+      name: "Organization",
+      role: `${visible.length} ${visible.length === 1 ? "worker" : "workers"}`,
+      email: "",
+      phone: "",
+      status: "active",
+      avatarUrl: "",
+      projectIds: [],
+    };
+    const nodes: OrgChartNode[] = visible.map((m) => ({
       id: m.id,
-      parentId: m.managerId ?? null,
+      parentId: m.managerId && visibleIds.has(m.managerId) ? m.managerId : ORG_ROOT_ID,
       name: m.name,
       role: m.role,
       email: m.email,
@@ -99,48 +147,8 @@ export function WorkforceView() {
       status: m.status,
       avatarUrl: m.avatarUrl,
       projectIds: m.projectIds,
-    });
-
-    const build = (items: TeamMember[]) => {
-      const nodes = items.map(toNode);
-      const roots = nodes.filter((n) => n.parentId === null);
-      if (roots.length <= 1) return nodes;
-      const rootId = "__org_root__";
-      nodes.push({
-        id: rootId,
-        parentId: null,
-        name: "Organization",
-        role: "",
-        email: "",
-        phone: "",
-        status: "active",
-        avatarUrl: "",
-        projectIds: [],
-      });
-      roots.forEach((r) => (r.parentId = rootId));
-      return nodes;
-    };
-
-    if (
-      selectedRoles.length === 0 &&
-      selectedProjects.length === 0 &&
-      statusFilter === "all" &&
-      !query
-    ) {
-      return build(teamMembers);
-    }
-
-    const includeIds = new Set(matchingIds);
-    const memberMap = new Map(teamMembers.map((m) => [m.id, m]));
-    matchingIds.forEach((id) => {
-      let current = memberMap.get(id);
-      while (current?.managerId) {
-        includeIds.add(current.managerId);
-        current = memberMap.get(current.managerId);
-      }
-    });
-
-    return build(teamMembers.filter((m) => includeIds.has(m.id)));
+    }));
+    return [root, ...nodes];
   }, [teamMembers, query, selectedRoles, selectedProjects, statusFilter]);
 
   function resetForm() {
@@ -148,6 +156,12 @@ export function WorkforceView() {
     setEditMember(null);
     setEditing(false);
     setDialogOpen(false);
+  }
+  function openAdd() {
+    setForm(emptyWorker());
+    setEditMember(null);
+    setEditing(false);
+    setDialogOpen(true);
   }
   function openEdit(member: TeamMember) {
     setEditMember(member);
@@ -159,15 +173,32 @@ export function WorkforceView() {
       avatarUrl: member.avatarUrl,
       status: member.status,
       projectIds: [...member.projectIds],
+      managerId: member.managerId,
     });
     setEditing(true);
     setDialogOpen(true);
   }
-  function saveWorker() {
-    resetForm();
+  async function saveWorker() {
+    if (!form.name.trim()) {
+      alert("Worker name is required");
+      return;
+    }
+    try {
+      if (editMember) await updateWorker(editMember.id, form);
+      else await createWorker(form);
+      resetForm();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to save worker");
+    }
   }
-  function deleteWorker(_id: string) {
-    if (editMember?.id === _id) resetForm();
+  async function deleteWorker(id: string) {
+    if (!confirm("Delete this worker?")) return;
+    try {
+      await removeWorker(id);
+      if (editMember?.id === id) resetForm();
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Failed to delete worker");
+    }
   }
 
   function handleOrgNodeClick(node: OrgChartNode) {
@@ -185,94 +216,104 @@ export function WorkforceView() {
 
   return (
     <>
-      <div className="flex flex-col gap-3 mb-5">
-        <div className="flex flex-col gap-3 sm:flex-row">
-          <div className="relative flex-1">
-            <IconSearch className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
-            <Input
-              className="pl-9"
-              placeholder="Search workers by name or role..."
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-            {query && (
-              <button
-                type="button"
-                onClick={() => setQuery("")}
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-              >
-                <IconX className="size-4" />
-              </button>
-            )}
-          </div>
-          <Dialog
-            trigger={
-              <Button>
-                <IconPlus className="size-4" />
-                Add worker
-              </Button>
+      <div className="flex flex-wrap items-center gap-3 mb-5 xl:flex-nowrap">
+        <div className="relative min-w-[180px] flex-1 sm:w-[200px]">
+          <IconSearch className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" />
+          <Input
+            className="pl-9" 
+            placeholder="Search workers..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          {query && (
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+            >
+              <IconX className="size-4" />
+            </button>
+          )}
+        </div>
+        <MultiSelect
+          options={roleOptions}
+          selected={selectedRoles}
+          onChange={setSelectedRoles}
+          placeholder="All Roles"
+          className="sm:min-w-[150px]"
+        />
+        <MultiSelect
+          options={projectOptions}
+          selected={selectedProjects}
+          onChange={setSelectedProjects}
+          placeholder="All Projects"
+          className="sm:min-w-[170px]"
+        />
+        <Select
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className="!w-[140px] shrink-0"
+        >
+          {statusOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
+        </Select>
+        {(query || selectedRoles.length > 0 || selectedProjects.length > 0 || statusFilter !== "all") && (
+          <Button variant="ghost" onClick={clearAllFilters}>
+            <IconX className="size-4" />Clear
+          </Button>
+        )}
+        <div className="flex rounded-lg border border-slate-200 p-1">
+          <Button
+            onClick={() => setViewMode("cards")}
+            variant={viewMode === "cards" ? "secondary" : "ghost"}
+            size="icon"
+            className="size-8"
+            title="Cards"
+          >
+            <IconLayoutGrid className="size-6" />
+          </Button>
+          <Button
+            onClick={() => setViewMode("orgchart")}
+            variant={viewMode === "orgchart" ? "secondary" : "ghost"}
+            size="icon"
+            className="size-8"
+            title="Organization Chart"
+          >
+            <IconHierarchy className="size-6" />
+          </Button>
+        </div>
+        <Button onClick={openAdd}>
+          <IconPlus className="size-4" />
+          Add worker
+        </Button>
+        <Dialog
+          open={dialogOpen}
+          onOpenChange={(o) => {
+            setDialogOpen(o);
+            if (!o) resetForm();
+          }}
+          title={editing ? "Edit Worker Profile" : "Add worker profile"}
+          description={editing ? "Update worker details." : "Enter worker details and project assignments."}
+          onInteractOutside={(e) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('[role="listbox"]') || target.closest('[role="option"]')) {
+              e.preventDefault();
             }
-            title="Add worker profile"
-            description="Enter worker details and project assignments."
-          >
-            <WorkerForm
-              form={form}
-              setForm={setForm}
-              onSave={saveWorker}
-              onCancel={resetForm}
-              editing={false}
-              projectOptions={projectOptions}
-            />
-          </Dialog>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <MultiSelect
-            options={roleOptions}
-            selected={selectedRoles}
-            onChange={setSelectedRoles}
-            placeholder="All Roles"
-            className="sm:min-w-[180px]"
+          }}
+        >
+          <WorkerForm
+            form={form}
+            setForm={setForm}
+            onSave={saveWorker}
+            onCancel={resetForm}
+            editing={!!editMember}
+            projectOptions={projectOptions}
+            managerOptions={managerOptions.filter((o) => o.value !== editMember?.id)}
           />
-          <MultiSelect
-            options={projectOptions}
-            selected={selectedProjects}
-            onChange={setSelectedProjects}
-            placeholder="All Projects"
-            className="sm:min-w-[200px]"
-          />
-          <Select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            className="sm:min-w-[150px]"
-          >
-            {statusOptions.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </Select>
-          <div className="flex rounded-lg border border-slate-200 p-1">
-            <Button
-              onClick={() => setViewMode("cards")}
-              variant={viewMode === "cards" ? "secondary" : "ghost"}
-              size="icon"
-              className="size-8"
-              title="Cards"
-            >
-              <IconLayoutGrid className="size-6" />
-            </Button>
-            <Button
-              onClick={() => setViewMode("orgchart")}
-              variant={viewMode === "orgchart" ? "secondary" : "ghost"}
-              size="icon"
-              className="size-8"
-              title="Organization Chart"
-            >
-              <IconHierarchy className="size-6" />
-            </Button>
-          </div>
-        </div>
+        </Dialog>
       </div>
 
       {viewMode === "orgchart" ? (
@@ -355,24 +396,6 @@ export function WorkforceView() {
         </div>
       )}
 
-      <Dialog
-        open={dialogOpen}
-        onOpenChange={(o) => {
-          setDialogOpen(o);
-          if (!o) resetForm();
-        }}
-        title="Edit Worker Profile"
-        description="Update worker details."
-      >
-        <WorkerForm
-          form={form}
-          setForm={setForm}
-          onSave={saveWorker}
-          onCancel={resetForm}
-          editing={!!editMember}
-          projectOptions={projectOptions}
-        />
-      </Dialog>
     </>
   );
 }
@@ -384,6 +407,7 @@ function WorkerForm({
   onCancel,
   editing,
   projectOptions,
+  managerOptions,
 }: {
   form: Omit<TeamMember, "id">;
   setForm: (f: Omit<TeamMember, "id">) => void;
@@ -391,6 +415,7 @@ function WorkerForm({
   onCancel: () => void;
   editing: boolean;
   projectOptions: { value: string; label: string }[];
+  managerOptions: { value: string; label: string }[];
 }) {
   return (
     <form
@@ -448,6 +473,22 @@ function WorkerForm({
         >
           <option value="active">Active</option>
           <option value="on_leave">On leave</option>
+        </Select>
+      </div>
+      <div>
+        <Label>Reports to (manager)</Label>
+        <Select
+          value={form.managerId ?? ""}
+          onChange={(e) =>
+            setForm({ ...form, managerId: e.target.value || undefined })
+          }
+        >
+          <option value="">No manager (top level)</option>
+          {managerOptions.map((o) => (
+            <option key={o.value} value={o.value}>
+              {o.label}
+            </option>
+          ))}
         </Select>
       </div>
       <div>
