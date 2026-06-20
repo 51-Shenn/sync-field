@@ -8,7 +8,6 @@ import {
   IconChevronRight,
   IconCircleCheck,
   IconClipboardCheck,
-  IconGasStation,
   IconHelmet,
   IconLayoutDashboard,
   IconLoader2,
@@ -24,7 +23,6 @@ const capabilities = [
   { icon: IconLayoutDashboard, title: "One operational view", description: "See project health, schedules, budgets, crews, and open issues without chasing updates." },
   { icon: IconClipboardCheck, title: "Field reporting", description: "Capture daily progress and site issues in a consistent workflow built for the field." },
   { icon: IconUsers, title: "Workforce coordination", description: "Know who is available, where crews are assigned, and where capacity is getting tight." },
-  { icon: IconGasStation, title: "Resource control", description: "Track equipment, materials, fuel, and budget allocation across your entire portfolio." },
 ];
 
 const metrics = [
@@ -65,7 +63,7 @@ function ProductPreview() {
         <aside className="hidden border-r border-white/10 bg-[#132238] p-4 md:block">
           <div className="flex items-center gap-2"><Image src="/icon.svg" alt="" width={34} height={34} /><span className="font-bold text-white">Sync<span className="text-orange-400">Field</span></span></div>
           <div className="mt-9 space-y-2 text-xs text-slate-400">
-            {[[IconLayoutDashboard,"Control Centre"],[IconClipboardCheck,"Site Reporting"],[IconHelmet,"Projects"],[IconUsers,"Workforce"],[IconGasStation,"Resources"]].map(([Icon,label], index) => { const IconComponent = Icon as typeof IconLayoutDashboard; return <div key={String(label)} className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 ${index === 0 ? "bg-orange-500 text-white" : ""}`}><IconComponent className="size-4" />{String(label)}</div>; })}
+            {[[IconLayoutDashboard,"Control Centre"],[IconClipboardCheck,"Site Reporting"],[IconHelmet,"Projects"],[IconUsers,"Workforce"]].map(([Icon,label], index) => { const IconComponent = Icon as typeof IconLayoutDashboard; return <div key={String(label)} className={`flex items-center gap-2.5 rounded-lg px-3 py-2.5 ${index === 0 ? "bg-orange-500 text-white" : ""}`}><IconComponent className="size-4" />{String(label)}</div>; })}
           </div>
         </aside>
         <div className="bg-slate-50">
@@ -105,7 +103,7 @@ export function LandingPage() {
         <div className="relative mx-auto max-w-7xl text-center">
           <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-orange-400/25 bg-orange-400/10 px-3 py-1.5 text-xs font-semibold text-orange-300"><IconHelmet className="size-3.5" />Built for teams that build</div>
           <h1 className="mx-auto mt-7 max-w-4xl text-4xl font-bold leading-[1.05] tracking-[-.04em] sm:text-6xl lg:text-7xl">Run every jobsite from <span className="text-orange-400">one clear view.</span></h1>
-          <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">SyncField brings project reporting, workforce planning, resource tracking, and portfolio oversight into one construction operations workspace.</p>
+          <p className="mx-auto mt-6 max-w-2xl text-base leading-7 text-slate-300 sm:text-lg">SyncField brings project reporting, workforce planning, and portfolio oversight into one construction operations workspace.</p>
           <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row"><LandingAction /><a href="#platform" className="inline-flex h-12 items-center gap-2 rounded-xl border border-white/15 px-6 font-semibold text-white transition hover:bg-white/10">Explore the platform <IconChevronRight className="size-4" /></a></div>
           <p className="mt-4 text-xs text-slate-500">Secure Google sign-in. No credit card required.</p>
           <ProductPreview />
@@ -118,7 +116,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section id="workflow" className="bg-white px-5 py-24 lg:px-8 lg:py-32"><div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[.8fr_1.2fr] lg:items-center"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-orange-600">A practical workflow</p><h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-5xl">From site update to portfolio decision.</h2><p className="mt-5 leading-7 text-slate-600">SyncField keeps operational information moving without adding another reporting burden.</p></div><div className="space-y-4">{[["01","Capture from the field","Log progress, issues, photos, and daily activity while details are fresh."],["02","Coordinate the response","Assign crews and resources with clear ownership across every active project."],["03","Act with confidence","See risk, delivery, and budget signals together in the Control Centre."]].map(([number,title,description]) => <div key={number} className="flex gap-5 rounded-2xl border border-slate-200 bg-slate-50 p-6"><span className="text-sm font-bold text-orange-500">{number}</span><div><h3 className="font-bold">{title}</h3><p className="mt-1 text-sm leading-6 text-slate-600">{description}</p></div></div>)}</div></div></section>
+      <section id="workflow" className="bg-white px-5 py-24 lg:px-8 lg:py-32"><div className="mx-auto grid max-w-7xl gap-14 lg:grid-cols-[.8fr_1.2fr] lg:items-center"><div><p className="text-xs font-bold uppercase tracking-[.18em] text-orange-600">A practical workflow</p><h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-5xl">From site update to portfolio decision.</h2><p className="mt-5 leading-7 text-slate-600">SyncField keeps operational information moving without adding another reporting burden.</p></div><div className="space-y-4">{[["01","Capture from the field","Log progress, issues, photos, and daily activity while details are fresh."],["02","Coordinate the response","Assign crews with clear ownership across every active project."],["03","Act with confidence","See risk, delivery, and budget signals together in the Control Centre."]].map(([number,title,description]) => <div key={number} className="flex gap-5 rounded-2xl border border-slate-200 bg-slate-50 p-6"><span className="text-sm font-bold text-orange-500">{number}</span><div><h3 className="font-bold">{title}</h3><p className="mt-1 text-sm leading-6 text-slate-600">{description}</p></div></div>)}</div></div></section>
 
       <section id="security" className="px-5 py-24 lg:px-8"><div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-10 rounded-3xl bg-[#132238] p-8 text-white sm:p-12 lg:flex-row lg:items-center"><div className="max-w-2xl"><div className="flex size-12 items-center justify-center rounded-xl bg-orange-500"><IconShieldCheck /></div><h2 className="mt-6 text-3xl font-bold tracking-tight">Your workspace. Your access.</h2><p className="mt-3 leading-7 text-slate-300">Google authentication keeps sign-in simple while SyncField maintains a clear, private workspace for your operating team.</p></div><LandingAction /></div></section>
     </main>

@@ -6,7 +6,7 @@
 > An AI-powered construction workforce manager that reads your Telegram chat, assigns workers automatically, and handles last-minute disruptions in real time.
 
 **Elevator pitch (30 seconds):**
-> "Every morning, construction foremen spend hours juggling WhatsApp and Telegram messages — 'Ah Ming MC today', 'Site B needs two more tilers'. They manually figure out who's available, who has the right skills, and who's closest to the site. We automate that. Our Telegram bot listens to your existing chat, parses natural language messages using AI, assigns workers based on skill and availability, and when someone calls in sick — it instantly suggests the best replacement. The dashboard shows you real-time worker status, utilization rates, and CO2 saved from smarter routing. It's smarter resource management for the construction industry."
+> "Every morning, construction foremen spend hours juggling WhatsApp and Telegram messages — 'Ah Ming MC today', 'Site B needs two more tilers'. They manually figure out who's available, who has the right skills, and who's closest to the site. We automate that. Our Telegram bot listens to your existing chat, parses natural language messages using AI, assigns workers based on skill and availability, and when someone calls in sick — it instantly suggests the best replacement. The dashboard shows you real-time worker status, utilization rates, and CO2 saved from smarter routing. It's smarter workforce management for the construction industry."
 
 ---
 

@@ -1,4 +1,4 @@
-import type { SiteReport } from "@/lib/mock-data";
+import type { SiteReport } from "@/lib/report-types";
 
 export type SiteReportFilters = {
   query: string;
