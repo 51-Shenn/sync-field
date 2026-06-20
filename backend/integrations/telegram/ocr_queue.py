@@ -3,15 +3,12 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from bot.document_processor import process_document
-
-EXTRACTIONS_DIR = Path(__file__).resolve().parent.parent / "extractions"
+from .document_processor import process_document
 
 
 class OcrQueue:
     def __init__(self) -> None:
         self._tasks: set[asyncio.Task] = set()
-        EXTRACTIONS_DIR.mkdir(exist_ok=True)
 
     def enqueue(
         self,
