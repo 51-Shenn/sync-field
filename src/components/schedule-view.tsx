@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { ChevronLeft, ChevronRight, Filter, Plus } from "lucide-react";
+import { IconChevronLeft, IconChevronRight, IconFilter, IconPlus } from "@tabler/icons-react";
 import { projects, tasks } from "@/lib/mock-data";
 import { Button, Card } from "@/components/ui";
 
@@ -13,8 +13,8 @@ export function ScheduleView() {
   const days = view === "month" ? monthDays : monthDays.slice(21,28);
   return <>
     <div className="mb-5 flex flex-col justify-between gap-3 sm:flex-row sm:items-center">
-      <div className="flex items-center gap-2"><Button variant="outline" size="icon"><ChevronLeft className="size-4"/></Button><Button variant="outline" size="icon"><ChevronRight className="size-4"/></Button><Button variant="outline">Today</Button><h3 className="ml-2 text-lg font-semibold text-slate-950">June 2026</h3></div>
-      <div className="flex flex-wrap gap-2"><Button variant="outline"><Filter className="size-4"/>Filters</Button><div className="flex rounded-lg border border-slate-200 bg-white p-1"><Button size="sm" variant={view === "month" ? "secondary" : "ghost"} onClick={()=>setView("month")}>Month</Button><Button size="sm" variant={view === "week" ? "secondary" : "ghost"} onClick={()=>setView("week")}>Week</Button></div><Button><Plus className="size-4"/>Add task</Button></div>
+      <div className="flex items-center gap-2"><Button variant="outline" size="icon"><IconChevronLeft className="size-4"/></Button><Button variant="outline" size="icon"><IconChevronRight className="size-4"/></Button><Button variant="outline">Today</Button><h3 className="ml-2 text-lg font-semibold text-slate-950">June 2026</h3></div>
+      <div className="flex flex-wrap gap-2"><Button variant="outline"><IconFilter className="size-4"/>Filters</Button><div className="flex rounded-lg border border-slate-200 bg-white p-1"><Button size="sm" variant={view === "month" ? "secondary" : "ghost"} onClick={()=>setView("month")}>Month</Button><Button size="sm" variant={view === "week" ? "secondary" : "ghost"} onClick={()=>setView("week")}>Week</Button></div><Button><IconPlus className="size-4"/>Add task</Button></div>
     </div>
     <Card className="overflow-hidden">
       <div className="grid grid-cols-7 border-b border-slate-200 bg-slate-50">{weekdays.map(day=><div key={day} className="px-2 py-3 text-center text-[10px] font-bold tracking-wider text-slate-400">{day}</div>)}</div>

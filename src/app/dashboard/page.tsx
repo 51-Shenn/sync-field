@@ -1,3 +1,5 @@
-import DashboardPage from "@/app/page";
+import { redirect } from "next/navigation";
 
-export default DashboardPage;
+export default function DashboardPage() {
+  redirect("/control-centre");
+}

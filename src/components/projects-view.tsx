@@ -2,19 +2,58 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Grid2X2, List, MapPin, Plus, Search } from "lucide-react";
-import { projects, teamMembers } from "@/lib/mock-data";
-import { ProjectCard } from "@/components/page-elements";
-import { Avatar, AvatarStack, Badge, Button, Dialog, Input, Label, Progress, Select, Table, Td, Textarea, Th } from "@/components/ui";
-import { formatCurrency } from "@/lib/utils";
+import { IconCalendarMonth, IconLayoutGrid, IconList, IconMapPin, IconPlus, IconSearch, IconTrash } from "@tabler/icons-react";
+import { useOperations } from "@/components/operations-provider";
+import type { OperationsProject } from "@/lib/operations-types";
+import { Avatar, Badge, Button, Card, CardContent, Dialog, Input, Label, Progress, Select, Table, Td, Textarea, Th } from "@/components/ui";
+import { ProjectTimeline } from "@/components/project-timeline";
 
-function NewProjectForm() { return <form className="grid gap-4" onSubmit={(e)=>e.preventDefault()}><div><Label>Project name</Label><Input placeholder="e.g. Downtown Commons"/></div><div className="grid gap-4 sm:grid-cols-2"><div><Label>Client</Label><Input placeholder="Client organization"/></div><div><Label>Location</Label><Input placeholder="City, State"/></div></div><div><Label>Description</Label><Textarea placeholder="Short project summary..."/></div><div className="grid gap-4 sm:grid-cols-2"><div><Label>Start date</Label><Input type="date"/></div><div><Label>Target completion</Label><Input type="date"/></div></div><div><Label>Estimated budget</Label><Input type="number" placeholder="$0"/></div><div className="flex justify-end gap-2 pt-2"><Button variant="outline" type="button">Save draft</Button><Button type="submit">Create project</Button></div></form>; }
+type ProjectForm = Omit<OperationsProject, "id" | "progress" | "siteId">;
+const emptyProject = (): ProjectForm => ({ name: "", client: "", location: "", status: "planning", startDate: "", endDate: "", managerId: "", color: "#f97316", description: "" });
 
 export function ProjectsView() {
-  const [view,setView]=useState<"grid"|"table">("grid"); const [query,setQuery]=useState(""); const [status,setStatus]=useState("all");
-  const filtered=useMemo(()=>projects.filter(p=>(status==="all"||p.status===status)&&`${p.name} ${p.client} ${p.location}`.toLowerCase().includes(query.toLowerCase())),[query,status]);
-  return <><div className="mb-5 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:flex-row sm:items-center"><div className="relative flex-1"><Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"/><Input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search projects, clients, locations..." className="border-0 bg-slate-50 pl-9 focus:bg-white"/></div><Select value={status} onChange={e=>setStatus(e.target.value)}><option value="all">All statuses</option><option value="planning">Planning</option><option value="in_progress">In progress</option><option value="on_hold">On hold</option><option value="completed">Completed</option></Select><div className="flex rounded-lg border border-slate-200 p-1"><Button onClick={()=>setView("grid")} variant={view==="grid"?"secondary":"ghost"} size="icon" className="size-8"><Grid2X2 className="size-4"/></Button><Button onClick={()=>setView("table")} variant={view==="table"?"secondary":"ghost"} size="icon" className="size-8"><List className="size-4"/></Button></div><Dialog trigger={<Button><Plus className="size-4"/>New project</Button>} title="Create a new project" description="Add the core project details. You can complete the setup later."><NewProjectForm/></Dialog></div>
-  <div className="mb-4 flex items-center justify-between text-xs text-slate-500"><span>{filtered.length} projects</span><span>Updated 8 minutes ago</span></div>
-  {view==="grid"?<div className="grid gap-5 md:grid-cols-2 2xl:grid-cols-3">{filtered.map(p=><ProjectCard project={p} key={p.id}/>)}</div>:<div className="overflow-hidden rounded-xl border border-slate-200 bg-white"><Table><thead><tr><Th>Project</Th><Th>Status</Th><Th>Progress</Th><Th>Budget</Th><Th>Manager & team</Th><Th>Timeline</Th></tr></thead><tbody>{filtered.map(p=>{const manager=teamMembers.find(m=>m.id===p.managerId)!; const names=p.teamIds.map(id=>teamMembers.find(m=>m.id===id)!.name); return <tr key={p.id} className="hover:bg-slate-50/70"><Td><Link href={`/projects/${p.id}`} className="block"><p className="font-semibold text-slate-900 hover:text-orange-600">{p.name}</p><p className="mt-1 flex items-center gap-1 text-xs"><MapPin className="size-3"/>{p.location}</p></Link></Td><Td><Badge value={p.status}/></Td><Td><div className="w-32"><div className="mb-1 flex justify-between text-xs"><span>{p.progress}%</span></div><Progress value={p.progress}/></div></Td><Td><p className="font-medium text-slate-900">{formatCurrency(p.budget,true)}</p><p className="mt-1 text-xs">{formatCurrency(p.spent,true)} spent</p></Td><Td><div className="flex items-center gap-3"><Avatar name={manager.name} size="sm"/><AvatarStack names={names} limit={3}/></div></Td><Td><p className="flex items-center gap-1.5 text-xs"><CalendarDays className="size-3.5"/>{p.endDate}</p></Td></tr>})}</tbody></Table></div>}
-  {filtered.length===0&&<div className="rounded-xl border border-dashed border-slate-300 bg-white py-20 text-center"><p className="font-medium text-slate-800">No matching projects</p><p className="mt-1 text-sm text-slate-500">Try a different search or filter.</p></div>}</>;
+  const { snapshot, loading, error, createProject, updateProject, deleteProject } = useOperations();
+  const [view, setView] = useState<"grid" | "table" | "timeline">("grid");
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState("all");
+  const [form, setForm] = useState<ProjectForm>(emptyProject());
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
+  const [formError, setFormError] = useState("");
+
+  const filtered = useMemo(() => snapshot.projects.filter((project) =>
+    (status === "all" || project.status === status) &&
+    `${project.name} ${project.client} ${project.location}`.toLowerCase().includes(query.toLowerCase())
+  ), [snapshot.projects, status, query]);
+
+  function openCreate() { setEditingId(null); setForm({ ...emptyProject(), managerId: snapshot.technicians[0]?.id ?? "" }); setFormError(""); setOpen(true); }
+  function openEdit(project: OperationsProject) {
+    setEditingId(project.id);
+    setForm({ name: project.name, client: project.client, location: project.location, status: project.status, startDate: project.startDate, endDate: project.endDate, managerId: project.managerId, color: project.color, description: project.description });
+    setFormError(""); setOpen(true);
+  }
+
+  async function save() {
+    if (!form.name.trim() || !form.client.trim() || !form.location.trim() || !form.startDate || !form.endDate) {
+      setFormError("Name, client, location, and project dates are required."); return;
+    }
+    if (form.endDate < form.startDate) { setFormError("Target completion must be after the start date."); return; }
+    try {
+      if (editingId) await updateProject(editingId, form);
+      else await createProject(form);
+      setOpen(false); setForm(emptyProject());
+    } catch (reason) { setFormError(reason instanceof Error ? reason.message : "Unable to save project"); }
+  }
+
+  if (loading) return <Card className="p-10 text-center text-sm text-slate-500">Loading live projects…</Card>;
+
+  return <>
+    {error && <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>}
+    <div className="mb-5 flex flex-col justify-between gap-3 lg:flex-row lg:items-center"><div className="flex flex-1 flex-wrap gap-2"><div className="relative min-w-56 flex-1 lg:max-w-sm"><IconSearch className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><Input className="pl-9" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search projects" /></div><Select value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All statuses</option><option value="planning">Planning</option><option value="in_progress">In progress</option><option value="on_hold">On hold</option><option value="completed">Completed</option></Select></div><div className="flex gap-2"><div className="flex rounded-lg border border-slate-200 bg-white p-1">{[["grid", IconLayoutGrid], ["table", IconList], ["timeline", IconCalendarMonth]].map(([value, Icon]) => <Button key={String(value)} size="icon" variant={view === value ? "secondary" : "ghost"} onClick={() => setView(value as typeof view)}><Icon className="size-4" /></Button>)}</div><Button onClick={openCreate}><IconPlus className="size-4" />New project</Button></div></div>
+
+    {view === "timeline" ? <ProjectTimeline projects={filtered} /> : view === "grid" ? <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">{filtered.map((project) => { const manager = snapshot.technicians.find((item) => item.id === project.managerId); return <Card key={project.id} className="group"><CardContent className="p-5"><div className="flex items-start justify-between"><Link href={`/projects/${project.id}`} className="min-w-0"><h3 className="truncate font-semibold text-slate-950 hover:text-orange-600">{project.name}</h3><p className="mt-1 text-xs text-slate-500">{project.client}</p></Link><Badge value={project.status} /></div><p className="mt-4 flex items-center gap-1.5 text-xs text-slate-500"><IconMapPin className="size-3.5" />{project.location}</p><div className="mt-5"><div className="mb-1.5 flex justify-between text-xs"><span className="text-slate-500">Progress</span><span className="font-semibold">{project.progress}%</span></div><Progress value={project.progress} /></div><div className="mt-5 flex items-center justify-between border-t border-slate-100 pt-4"><div className="flex items-center gap-2">{manager && <Avatar name={manager.name} size="sm" />}<span className="max-w-28 truncate text-xs text-slate-500">{manager?.name || "Unassigned"}</span></div><div className="flex gap-1"><Button size="sm" variant="ghost" onClick={() => openEdit(project)}>Edit</Button><Button size="icon" variant="ghost" className="text-red-500" onClick={() => { if (window.confirm(`Delete ${project.name}?`)) void deleteProject(project.id); }}><IconTrash className="size-4" /></Button></div></div></CardContent></Card>; })}</div> : <Card className="overflow-hidden"><Table><thead><tr><Th>Project</Th><Th>Status</Th><Th>Progress</Th><Th>Manager</Th><Th>Timeline</Th><Th /></tr></thead><tbody>{filtered.map((project) => { const manager = snapshot.technicians.find((item) => item.id === project.managerId); return <tr key={project.id}><Td><Link href={`/projects/${project.id}`} className="font-semibold text-slate-900 hover:text-orange-600">{project.name}</Link><p className="mt-1 text-xs text-slate-500">{project.location}</p></Td><Td><Badge value={project.status} /></Td><Td><div className="w-32"><span className="text-xs">{project.progress}%</span><Progress value={project.progress} /></div></Td><Td>{manager?.name || "Unassigned"}</Td><Td>{project.startDate} – {project.endDate}</Td><Td><Button size="sm" variant="ghost" onClick={() => openEdit(project)}>Edit</Button></Td></tr>; })}</tbody></Table></Card>}
+    {!filtered.length && <Card className="border-dashed p-16 text-center text-sm text-slate-500">No matching projects.</Card>}
+
+    <Dialog open={open} onOpenChange={setOpen} title={editingId ? "Edit project" : "Create project"} description="Project records are stored in the shared operations database."><form className="grid gap-4" onSubmit={(event) => { event.preventDefault(); void save(); }}><div><Label>Project name</Label><Input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></div><div className="grid grid-cols-2 gap-4"><div><Label>Client</Label><Input value={form.client} onChange={(event) => setForm({ ...form, client: event.target.value })} /></div><div><Label>Location</Label><Input value={form.location} onChange={(event) => setForm({ ...form, location: event.target.value })} /></div></div><div><Label>Description</Label><Textarea value={form.description} onChange={(event) => setForm({ ...form, description: event.target.value })} /></div><div className="grid grid-cols-2 gap-4"><div><Label>Start date</Label><Input type="date" value={form.startDate} onChange={(event) => setForm({ ...form, startDate: event.target.value })} /></div><div><Label>Target completion</Label><Input type="date" min={form.startDate} value={form.endDate} onChange={(event) => setForm({ ...form, endDate: event.target.value })} /></div></div><div className="grid grid-cols-2 gap-4"><div><Label>Manager</Label><Select value={form.managerId} onChange={(event) => setForm({ ...form, managerId: event.target.value })}><option value="">Unassigned</option>{snapshot.technicians.map((member) => <option key={member.id} value={member.id}>{member.name}</option>)}</Select></div><div><Label>Status</Label><Select value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as ProjectForm["status"] })}><option value="planning">Planning</option><option value="in_progress">In progress</option><option value="on_hold">On hold</option><option value="completed">Completed</option></Select></div></div>{formError && <p className="text-sm text-red-600">{formError}</p>}<div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button><Button type="submit">{editingId ? "Save changes" : "Create project"}</Button></div></form></Dialog>
+  </>;
 }
