@@ -332,12 +332,13 @@ export function MultiSelect({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
 
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node))
+      if (ref.current && !ref.current.contains(e.target as Node) && !menuRef.current?.contains(e.target as Node))
         setOpen(false);
     };
     document.addEventListener("mousedown", handler);
@@ -405,6 +406,8 @@ export function MultiSelect({
       {open &&
         createPortal(
           <div
+            ref={menuRef}
+            role="listbox"
             className="z-50 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
             style={{
               position: "fixed",
@@ -420,6 +423,8 @@ export function MultiSelect({
                 <button
                   key={opt.value}
                   type="button"
+                  role="option"
+                  aria-selected={isSelected}
                   className="flex w-full items-center gap-3 px-3 py-2.5 text-left text-sm transition-colors duration-100 hover:bg-slate-50"
                   onClick={() =>
                     onChange(
@@ -482,6 +487,7 @@ export function Select({
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
   const [coords, setCoords] = useState({ top: 0, left: 0, width: 0 });
   const [internalValue, setInternalValue] = useState(defaultValue ?? "");
 
@@ -505,7 +511,7 @@ export function Select({
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node))
+      if (ref.current && !ref.current.contains(e.target as Node) && !menuRef.current?.contains(e.target as Node))
         setOpen(false);
     };
     document.addEventListener("mousedown", handler);
@@ -528,7 +534,12 @@ export function Select({
           "relative flex h-10 w-full items-center rounded-xl border border-slate-200 bg-white px-3 pr-10 text-left text-sm text-slate-700 outline-none transition-shadow duration-150 focus:border-orange-400 focus:ring-2 focus:ring-orange-100 hover:shadow-sm",
           className,
         )}
-        {...(props as any)}
+        id={props.id}
+        name={props.name}
+        disabled={props.disabled}
+        aria-label={props["aria-label"]}
+        aria-haspopup="listbox"
+        aria-expanded={open}
       >
         <span className="flex-1 truncate">{label}</span>
         <svg
@@ -547,6 +558,8 @@ export function Select({
       {open &&
         createPortal(
           <div
+            ref={menuRef}
+            role="listbox"
             className="z-50 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg"
             style={{
               position: "fixed",
@@ -563,6 +576,8 @@ export function Select({
                 <button
                   key={String(optValue)}
                   type="button"
+                  role="option"
+                  aria-selected={isSelected}
                   className={cn(
                     "flex w-full items-center px-3 py-2.5 text-left text-sm transition-colors duration-100 hover:bg-slate-50",
                     isSelected
@@ -571,12 +586,9 @@ export function Select({
                   )}
                   onClick={() => {
                     const newVal = opt.props.value ?? String(opt.props.children);
-                    if (!value) setInternalValue(newVal);
-                    onChange?.({
-                      target: {
-                        value: newVal,
-                      },
-                    } as any);
+                    if (value === undefined) setInternalValue(newVal);
+                    const target = { value: newVal } as HTMLSelectElement;
+                    onChange?.({ target, currentTarget: target } as React.ChangeEvent<HTMLSelectElement>);
                     setOpen(false);
                   }}
                 >
