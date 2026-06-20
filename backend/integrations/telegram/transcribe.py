@@ -1,3 +1,4 @@
+# Voice transcription via faster-whisper (CTranslate2 backend, CPU int8)
 from faster_whisper import WhisperModel
 
 _model = None

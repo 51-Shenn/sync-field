@@ -1,3 +1,5 @@
+# Chat history fetcher — downloads up to N recent messages on startup.
+# Prints human-readable log locally; also downloads any photos found.
 from datetime import datetime
 from pathlib import Path
 
