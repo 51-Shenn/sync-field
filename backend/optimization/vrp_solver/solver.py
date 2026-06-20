@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass
-from typing import Dict, List, Set, Tuple, Union
+from typing import Dict, List, Set, Tuple
 from ortools.sat.python import cp_model
 
 
@@ -45,6 +45,11 @@ class VRPSolver:
 
         return True, "eligible"
 
+    def _score(self, tech: dict, task: dict, task_id: str) -> float:
+        priority = self.engine.compute_priority(task_id).score
+        distance_penalty = self._distance(tech, task) * 5.0
+        return priority - distance_penalty
+
     def solve_reassignment(
         self, idle_technician_ids: List[str], exclude_tasks: Set[str], now_hour: float = 9.0
     ) -> List[Assignment]:
@@ -85,10 +90,8 @@ class VRPSolver:
         for (tech_id, task_id), var in x.items():
             tech = self.technicians[tech_id]
             task = ready_tasks[task_id]
-            priority = self.engine.compute_priority(task_id).score
-            distance_penalty = self._distance(tech, task) * 5.0
-            weight = int((priority - distance_penalty) * 100)
-            objective_terms.append(weight * var)
+            score = self._score(tech, task, task_id)
+            objective_terms.append(int(score * 100) * var)
 
         model.Maximize(sum(objective_terms))
 
@@ -102,9 +105,7 @@ class VRPSolver:
                 if solver.Value(var) == 1:
                     tech = self.technicians[tech_id]
                     task = ready_tasks[task_id]
-                    priority = self.engine.compute_priority(task_id).score
-                    distance_penalty = self._distance(tech, task) * 5.0
-                    individual_score = round(priority - distance_penalty, 2)
+                    individual_score = round(self._score(tech, task, task_id), 2)
                     results.append(Assignment(tech_id, task_id, individual_score))
 
         return results

@@ -255,16 +255,16 @@ class FieldOpsParser:
                 messages=[{"role": "user", "content": prompt}],
             )
             raw_text = (resp.choices[0].message.content or "").strip()
-        except Exception:
+        except Exception as exc:
             return ParseResult(task_id="", failure_type="", technician_id=tech_id,
-                               tier=3, raw_input=text, extra={"llm_status": "api_call_failed"})
+                               tier=3, raw_input=text,
+                               extra={"llm_status": "api_call_failed", "error": str(exc)[:120]})
 
         if not raw_text:
             return ParseResult(task_id="", failure_type="", technician_id=tech_id,
                                tier=3, raw_input=text, extra={"llm_status": "empty_response", "model": model})
 
-        import re as _re
-        pipe_match = _re.match(r'\s*([TS]\d{2,})\s*\|\s*(\w[\w_]*\w)\s*', raw_text, _re.IGNORECASE)
+        pipe_match = re.match(r'\s*([TS]\d{2,})\s*\|\s*(\w[\w_]*\w)\s*', raw_text, re.IGNORECASE)
         if pipe_match:
             return ParseResult(
                 task_id=pipe_match.group(1).upper(),
@@ -290,7 +290,7 @@ class FieldOpsParser:
         except (json.JSONDecodeError, TypeError):
             pass
 
-        json_match = _re.search(r'\{[^}]+\}', raw_text)
+        json_match = re.search(r'\{[^}]+\}', raw_text)
         if json_match:
             try:
                 data = json.loads(json_match.group())
@@ -311,7 +311,7 @@ class FieldOpsParser:
         for category, failures in FAILURE_KEYWORD_MAP.items():
             for failure_type, patterns in failures.items():
                 for pattern in patterns:
-                    if _re.search(pattern, raw_text.lower()):
+                    if re.search(pattern, raw_text.lower()):
                         failure_from_llm = failure_type
                         break
                 if failure_from_llm:

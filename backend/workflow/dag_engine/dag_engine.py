@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Dict, List, Set, Callable, Union
+from typing import Dict, List, Set, Optional, Callable, Union
 
 # --- 1. Failure Taxonomy & Domain Configurations ---
 FAILURE_CATEGORIES = {
@@ -38,7 +38,7 @@ class TechnicianSchedule:
     def __init__(self, windows: List[AvailabilityWindow]):
         self.windows = sorted(windows, key=lambda w: w.start)
 
-    def next_available_slot(self, after: datetime, duration: timedelta) -> tuple:
+    def next_available_slot(self, after: datetime, duration: timedelta) -> tuple[Optional[datetime], str]:
         for w in self.windows:
             if w.end <= after:
                 continue
@@ -193,7 +193,7 @@ class SyncFieldDAG:
             })
 
         return affected
-    def compute_cascade_eta(self, blocked_task_id: str, schedules: dict = None) -> dict:
+    def compute_cascade_eta(self, blocked_task_id: str, schedules: Optional[dict] = None) -> dict:
         """
         Propagates time impact downstream from a blocked node.
         Confidence degrades: EXACT → ESTIMATED → UNKNOWN.

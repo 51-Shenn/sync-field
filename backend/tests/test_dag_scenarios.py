@@ -1,5 +1,5 @@
 from backend.workflow.dag_engine.dag_engine import SyncFieldDAG
-from backend.optimization.vrp_solver.solver import VRPSolver, Assignment
+from backend.optimization.vrp_solver.solver import VRPSolver
 from backend.integrations.notifications.stub import StubNotifier
 from backend.workflow.event_handlers.dispatcher import FieldOpsDispatcher
 from backend.workflow.parser.parser import FieldOpsParser
