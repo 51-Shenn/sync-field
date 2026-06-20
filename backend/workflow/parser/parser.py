@@ -196,8 +196,8 @@ class FieldOpsParser:
             cached = self.cache.get(key)
             if cached:
                 return ParseResult(
-                    task_id=cached.get("task_id", ""),
-                    failure_type=cached.get("failure_type", ""),
+                    task_id=cached.get("resolved_state", ""),
+                    failure_type=cached.get("resolved_failure_type", ""),
                     technician_id=tech_id,
                     tier=3,
                     cached=True,
@@ -207,13 +207,7 @@ class FieldOpsParser:
         resolved = self._call_llm(text, tech_id)
 
         if self.cache and resolved.task_id and resolved.failure_type:
-            self.cache.set(
-                key,
-                resolved.failure_type,
-            )
-            self.cache.sb.table("resolution_cache").update({
-                "task_id": resolved.task_id,
-            }).eq("cache_key", key).execute()
+            self.cache.set(key, resolved.task_id, resolved.failure_type)
 
         return resolved
 
