@@ -1,4 +1,4 @@
-telethon>=1.37,<2
+telethon>=1.44.0,<2
 python-dotenv>=1.0,<2
 faster-whisper>=1.0,<2
 PyMuPDF>=1.25,<2
