@@ -20,6 +20,8 @@ async def main() -> None:
     sb_client = get_supabase_client()
 
     db_tasks = sb_client.table("tasks").select("*").execute().data or []
+    for t in db_tasks:
+        t.setdefault("task_id", t.pop("id", None))
     engine = SyncFieldDAG(db_tasks)
 
     tech_data = sb_client.table("technicians").select("*").execute().data or []
