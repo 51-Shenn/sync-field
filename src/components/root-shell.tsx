@@ -16,6 +16,10 @@ export function RootShell({ children }: { children: React.ReactNode }) {
   }, [isLandingPage, isPending, router, session?.user]);
 
   if (isLandingPage) return children;
-  if (isPending || !session?.user) return <div className="min-h-screen bg-slate-50" />;
+  if (isPending || !session?.user) return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-50">
+      <img src="/syncfield.svg" alt="SyncField" className="h-120 w-auto" />
+    </div>
+  );
   return <AppShell>{children}</AppShell>;
 }

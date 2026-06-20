@@ -1,7 +1,6 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
 import { useState } from "react";
 import {
   IconArrowRight,
@@ -19,6 +18,7 @@ import {
   IconX,
 } from "@tabler/icons-react";
 import { authClient, signInSocial } from "@/lib/auth-client";
+import { SplashScreen } from "@/components/splash-screen";
 
 const capabilities = [
   { icon: IconLayoutDashboard, title: "One operational view", description: "See project health, schedules, budgets, crews, and open issues without chasing updates." },
@@ -36,9 +36,16 @@ const metrics = [
 function LandingAction({ compact = false }: { compact?: boolean }) {
   const { data: session, isPending } = authClient.useSession();
   const [signingIn, setSigningIn] = useState(false);
+  const [splashing, setSplashing] = useState(false);
 
   if (isPending) return <span className={`${compact ? "h-10 w-28" : "h-12 w-44"} animate-pulse rounded-xl bg-slate-200`} />;
-  if (session?.user) return <Link href="/control-centre" className={`${compact ? "h-10 px-4 text-sm" : "h-12 px-6"} inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 font-semibold text-white shadow-lg shadow-orange-500/20 transition hover:bg-orange-600`}>Open workspace <IconArrowRight className="size-4" /></Link>;
+  if (session?.user) return <>
+    <button
+      onClick={() => setSplashing(true)}
+      className={`${compact ? "h-10 px-4 text-sm" : "h-12 px-6"} inline-flex items-center justify-center gap-2 rounded-xl bg-orange-500 font-semibold text-white shadow-lg shadow-orange-500/20 transition hover:bg-orange-600`}
+    >Open workspace <IconArrowRight className="size-4" /></button>
+    {splashing && <SplashScreen href="/control-centre" onDone={() => setSplashing(false)} />}
+  </>;
 
   return <button
     onClick={async () => { setSigningIn(true); await signInSocial(); setSigningIn(false); }}
