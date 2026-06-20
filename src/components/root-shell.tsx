@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { authClient } from "@/lib/auth-client";
+import { OperationsProvider } from "@/components/operations-provider";
 
 export function RootShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -21,5 +22,5 @@ export function RootShell({ children }: { children: React.ReactNode }) {
       <img src="/syncfield.svg" alt="SyncField" className="h-120 w-auto" />
     </div>
   );
-  return <AppShell>{children}</AppShell>;
+  return <OperationsProvider><AppShell>{children}</AppShell></OperationsProvider>;
 }

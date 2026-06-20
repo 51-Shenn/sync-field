@@ -15,6 +15,21 @@ class FieldOpsDispatcher:
         if self.sb and events:
             self.engine.sync_to_supabase(events, self.sb)
 
+    def persist_tasks(self, task_ids: list[str]) -> None:
+        if not self.sb:
+            return
+        for task_id in set(task_ids):
+            task = self.engine.tasks.get(task_id)
+            if not task:
+                continue
+            deadline = task.get("deadline")
+            scheduled_start = task.get("scheduled_start")
+            self.sb.table("tasks").update({
+                "assigned_to": task.get("assigned_to"),
+                "deadline": deadline.isoformat() if hasattr(deadline, "isoformat") else deadline,
+                "scheduled_start": scheduled_start.isoformat() if hasattr(scheduled_start, "isoformat") else scheduled_start,
+            }).eq("id", task_id).execute()
+
     def process_failure_report(self, task_id: str, failure_type: str, technician_id: str) -> dict:
         decision = self.domain_rules.handle_task_failure(
             self.engine, task_id, failure_type, technician_id
@@ -58,6 +73,11 @@ class FieldOpsDispatcher:
             if t["technician_id"] in assigned_techs:
                 self.engine.tasks[t["task_id"]]["assigned_to"] = None
 
+        self.persist_tasks(
+            [a.task_id for a in assignments]
+            + [t["task_id"] for t in decision["affected_technicians"]]
+        )
+
         decision["rerouting_results"] = [
             {"technician_id": a.technician_id, "new_task": a.task_id} for a in assignments
         ]
@@ -93,6 +113,7 @@ class FieldOpsDispatcher:
         )
         self._sync(events)
         self.engine.tasks[task_id]["assigned_to"] = technician_id
+        self.persist_tasks([task_id])
         self.notifier.notify(
             technician_id,
             f"Task {task_id} started — marked ACTIVE."
@@ -141,6 +162,8 @@ class FieldOpsDispatcher:
         for tech_id in idle_tech_ids:
             if tech_id not in {a.technician_id for a in assignments}:
                 self.notifier.notify(tech_id, "No eligible newly-unlocked task — standby.")
+
+        self.persist_tasks([a.task_id for a in assignments])
 
         return {
             "task_id": task_id,
@@ -200,6 +223,8 @@ class FieldOpsDispatcher:
                 f"{len(assignments)} reassigned."
             )
         )
+
+        self.persist_tasks(freed_ids + [a.task_id for a in assignments])
 
         return {
             "absent_technician": technician_id,

@@ -7,7 +7,6 @@ generator client {
   provider = "prisma-client-js"
   output   = "../src/generated/prisma/client"
 }
-
 datasource db {
   provider = "postgresql"
 }
@@ -73,35 +72,4 @@ model Verification {
 
   @@index([identifier])
   @@map("verification")
-}
-
-model Task {
-  id         String    @id @default(cuid())
-  projectId  String
-  title      String
-  status     String    @default("todo")
-  priority   String    @default("medium")
-  assigneeId String?
-  dueDate    String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  subtasks   Subtask[]
-
-  @@index([projectId])
-  @@map("task")
-}
-
-model Subtask {
-  id         String   @id @default(cuid())
-  taskId     String
-  title      String
-  status     String   @default("todo")
-  assigneeId String?
-  dueDate    String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-
-  @@index([taskId])
-  @@map("subtask")
 }
