@@ -1,5 +1,5 @@
 telethon>=1.37,<2
-python-dotenv>=1.0,<2
+python-dotenv>=1.2.2,<2
 faster-whisper>=1.0,<2
 PyMuPDF>=1.25,<2
 python-docx>=1.1,<2
