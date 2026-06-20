@@ -5,6 +5,15 @@ from integrations.telegram import config
 from integrations.telegram.sender import send_message, send_approval
 
 
+def _resolve_chat_id(chat_id: str | int) -> str | int:
+    if isinstance(chat_id, int):
+        return chat_id
+    try:
+        return int(chat_id)
+    except (ValueError, TypeError):
+        return str(chat_id).strip()
+
+
 def _check_auth(request: web.Request) -> str | None:
     token = request.headers.get("X-Auth-Token", "")
     if token != config.HTTP_AUTH_TOKEN:
@@ -28,7 +37,7 @@ async def handle_send(request: web.Request) -> web.Response:
         return web.json_response({"ok": False, "error": "chat_id and text required"}, status=400)
 
     client = request.app["telegram_client"]
-    result = await send_message(client, int(chat_id), text)
+    result = await send_message(client, _resolve_chat_id(chat_id), text)
     return web.json_response(result)
 
 
@@ -47,7 +56,7 @@ async def handle_send_approval(request: web.Request) -> web.Response:
         return web.json_response({"ok": False, "error": "chat_id and shift_id required"}, status=400)
 
     client = request.app["telegram_client"]
-    result = await send_approval(client, int(chat_id), shift_id, title, body_text)
+    result = await send_approval(client, _resolve_chat_id(chat_id), shift_id, title, body_text)
     return web.json_response(result)
 
 
