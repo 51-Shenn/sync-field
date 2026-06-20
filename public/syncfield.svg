@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="297mm"
+   height="210mm"
+   viewBox="0 0 297 210"
+   version="1.1"
+   id="svg1"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <g
+     id="layer1">
+    <g
+       id="g22"
+       transform="translate(46.953766)">
+      <g
+         id="g12">
+        <path
+           style="fill:#808080;stroke:none;stroke-width:2.64583;stroke-dasharray:none;stroke-opacity:1"
+           d="M 79.999998,84.999999 89.999996,75 99.999997,80.000001 V 100 H 79.999998 Z"
+           id="path7" />
+        <path
+           style="fill:#ffffff;stroke:none;stroke-width:2.61691;stroke-dasharray:none;stroke-opacity:1"
+           d="m 80.903043,85.304349 8.999999,-8.804348 v 22.5 h -8.999999 z"
+           id="path8" />
+        <path
+           style="fill:#808080;stroke:none;stroke-width:2.64583;stroke-dasharray:none;stroke-opacity:1"
+           d="m 89.999996,75 v 0 l 10e-7,-10 L 103,55 116,60 V 70.000001 L 112.99999,72 v 28 H 99.999997 V 80.000001 Z"
+           id="path9" />
+        <path
+           style="fill:#ffffff;stroke:none;stroke-width:2.64583;stroke-dasharray:none;stroke-opacity:1"
+           d="m 89.999997,73.486136 1,0.513865 V 65.411346 L 103,56.386416 V 99.000001 H 99.999997 V 80.000002 L 89.999996,75.000001 Z"
+           id="path10" />
+        <path
+           style="fill:#808080;stroke:none;stroke-width:2.64583;stroke-dasharray:none;stroke-opacity:1"
+           d="M 117.00001,69 124,72 v 28 h -6.99999 z"
+           id="path11" />
+        <path
+           style="fill:#808080;stroke:none;stroke-width:2.64583;stroke-dasharray:none;stroke-opacity:1"
+           d="m 123.99999,99 v 1 0 0 H 74.999997 v -1 z"
+           id="path12" />
+      </g>
+      <path
+         style="fill:#808080;stroke:none;stroke-width:2.64583;stroke-dasharray:none;stroke-opacity:1"
+         d="M 59.999998,95.000002 110,30 Z"
+         id="path13" />
+      <path
+         style="fill:#ff6600;stroke:none;stroke-width:2.10725;stroke-dasharray:none;stroke-opacity:1"
+         d="m 61.955972,74.020665 -9.955973,1.882368 20.74388,-19.053735 -1.83755,24.239613 -3.885505,-4.840231 v 0 c 0,0 17.169133,-58.198182 0,0 -17.169144,58.19819 59.401706,26.78743 59.401706,26.78743 0,0 -11.67519,11.20879 -33.582663,16.42655 C 44.489442,130.9784 61.955972,74.020665 61.955972,74.020665 Z"
+         id="path18" />
+      <path
+         style="fill:#000080;stroke:none;stroke-width:2.10725;stroke-dasharray:none;stroke-opacity:1"
+         d="M 141.21661,79.71736 151.09247,77.451946 131.09982,97.292494 132,73.000002 l 4.0695,4.686584 v 0 c 0,0 -14.90901,58.817754 0,0 14.90903,-58.817764 -60.391803,-24.473658 -60.391803,-24.473658 0,0 11.233656,-11.651267 32.923313,-17.711091 47.86969,-13.374194 32.6156,44.215523 32.6156,44.215523 z"
+         id="path20" />
+    </g>
+    <text
+       xml:space="preserve"
+       style="font-size:17.6389px;text-align:start;writing-mode:lr-tb;direction:ltr;text-anchor:start;fill:#ff6600;stroke:none;stroke-width:2.64583;stroke-dasharray:none;stroke-opacity:1"
+       x="109.80724"
+       y="143.05693"
+       id="text20"><tspan
+         id="tspan20"
+         style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-size:17.6389px;font-family:System-ui;-inkscape-font-specification:System-ui;stroke:none;stroke-width:2.64583"
+         x="109.80724"
+         y="143.05693">Sync<tspan
+   style="font-style:normal;font-variant:normal;font-weight:bold;font-stretch:normal;font-family:System-ui;-inkscape-font-specification:System-ui;fill:#000080;fill-opacity:1"
+   id="tspan21">Field</tspan></tspan></text>
+    <path
+       style="fill:#ffffff;fill-opacity:1;stroke:none;stroke-width:2.64583;stroke-dasharray:none;stroke-opacity:1"
+       d="m 163.95378,69 -4.00002,3 v 27.002069 h 4.07739 z"
+       id="path22" />
+  </g>
+</svg>
