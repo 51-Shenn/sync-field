@@ -4,12 +4,11 @@ import { useMemo, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { IconBell, IconBriefcase2, IconChevronDown, IconChevronsLeft, IconChevronsRight, IconLayoutDashboard, IconLogout, IconMenu2, IconDeviceDesktop, IconSearch, IconSettings, IconUsers, IconX } from "@tabler/icons-react";
+import { IconBriefcase2, IconChevronDown, IconChevronsLeft, IconChevronsRight, IconLayoutDashboard, IconLogout, IconMenu2, IconDeviceDesktop, IconSearch, IconSettings, IconUsers, IconX } from "@tabler/icons-react";
 import { GoogleSignInButton } from "@/components/google-sign-in-button";
 import { Avatar, Badge, Button, Dialog, Input, Skeleton } from "@/components/ui";
 import { authClient } from "@/lib/auth-client";
 import { useProjects } from "@/lib/use-data";
-import { useOperations } from "@/components/operations-provider";
 import { cn } from "@/lib/utils";
 
 const nav = [
@@ -88,12 +87,8 @@ export function Sidebar({ collapsed, setCollapsed }: { collapsed: boolean; setCo
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { projects } = useProjects();
-  const { snapshot } = useOperations();
-  const pendingAlerts = snapshot.alerts.filter(a => a.status === "pending").length;
-  const pendingAlertList = snapshot.alerts.filter(a => a.status === "pending").slice(0, 8);
   const [collapsed, setCollapsed] = useState(false);
   const [mobile, setMobile] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const results = useMemo(() => search.length < 2 ? [] : [
@@ -109,31 +104,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <Button variant="ghost" size="icon" className="lg:hidden" onClick={() => setMobile(true)} aria-label="Open menu"><IconMenu2 className="size-5" /></Button>
         <div className="ml-auto flex items-center gap-2">
           <div className="relative hidden w-64 md:block"><IconSearch className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" /><Input value={search} onChange={(event) => { setSearch(event.target.value); setSearchOpen(true); }} onFocus={() => setSearchOpen(true)} placeholder="Search projects, tasks..." className="pl-9" />{searchOpen && results.length > 0 && <div className="absolute right-0 top-12 w-80 rounded-xl border border-slate-200 bg-white p-2 shadow-xl">{results.map(result => <Link key={result.href + result.label} href={result.href} onClick={() => { setSearchOpen(false); setSearch(""); }} className="flex items-center justify-between rounded-lg px-3 py-2.5 hover:bg-slate-50"><span className="text-sm font-medium text-slate-800">{result.label}</span><Badge>{result.type}</Badge></Link>)}</div>}</div>
-          <div className="relative">
-            <Button variant="ghost" size="icon" className="relative" aria-label="Notifications" onClick={() => setNotifOpen(!notifOpen)}><IconBell className="size-5" />{pendingAlerts > 0 && <span className="absolute right-1.5 top-1.5 flex size-4 items-center justify-center rounded-full bg-orange-500 text-[9px] font-bold text-white ring-2 ring-white">{pendingAlerts}</span>}</Button>
-            {notifOpen && (
-              <div className="absolute right-0 top-12 z-50 w-80 rounded-xl border border-slate-200 bg-white p-3 shadow-xl">
-                <div className="flex items-center justify-between mb-2">
-                  <p className="text-xs font-semibold text-slate-800">Notifications</p>
-                  {pendingAlerts > 0 && <button onClick={() => setNotifOpen(false)} className="rounded p-0.5 text-slate-400 hover:text-slate-600"><IconX className="size-3.5" /></button>}
-                </div>
-                {pendingAlertList.length === 0 ? (
-                  <p className="py-4 text-center text-xs text-slate-400">No pending alerts</p>
-                ) : (
-                  <div className="space-y-2 max-h-72 overflow-y-auto">
-                    {pendingAlertList.map((alert) => (
-                      <div key={alert.id} className="flex items-start gap-2 rounded-lg border border-red-100 bg-red-50/60 p-2">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-[11px] font-semibold text-red-800">{alert.category || "Workflow alert"}</p>
-                          <p className="mt-0.5 text-[11px] leading-snug text-red-700 line-clamp-2">{alert.message}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
         </div>
       </header>
       <main className="mx-auto max-w-[1600px] p-4 sm:p-6 lg:p-8">{children}</main>
