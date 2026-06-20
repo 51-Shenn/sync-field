@@ -51,9 +51,12 @@ async def main() -> None:
         print(f"Skipping history (bot not admin?): {e}")
 
     await setup_listener(client)
-    await client.run_until_disconnected()
 
-    realtime_listener.stop()
+    try:
+        await client.run_until_disconnected()
+    finally:
+        print("\n[Bot] Shutting down. Cleaning up Event Bus channels...")
+        realtime_listener.stop()
 
 
 if __name__ == "__main__":

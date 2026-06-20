@@ -96,7 +96,8 @@ class VRPSolver:
             task = ready_tasks[task_id]
             score = self._pair_score(tech_id, task_id, tech, task)
             pair_scores[(tech_id, task_id)] = score
-            objective_terms.append(int(score * self.OBJECTIVE_SCALE) * var)
+            weight = int(score * self.OBJECTIVE_SCALE)
+            objective_terms.append(max(1, weight) * var)
 
         model.Maximize(sum(objective_terms))
 
