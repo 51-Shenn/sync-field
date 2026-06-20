@@ -23,6 +23,7 @@ type OperationsContextValue = {
 
 const emptySnapshot: OperationsSnapshot = {
   projects: [], tasks: [], subtasks: [], technicians: [], taskEvents: [], alerts: [], processedMessages: [], commands: [],
+  reports: [], documents: [],
 };
 
 const OperationsContext = createContext<OperationsContextValue | null>(null);

@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useOperations } from "@/components/operations-provider";
-import type { DocumentFile } from "@/lib/document-types";
 import type { SiteReport } from "@/lib/report-types";
 import type { AuditLog } from "@/lib/audit-types";
 import type { TeamMember } from "@/lib/team-types";
@@ -42,34 +41,28 @@ async function fetchJson(url: string) {
 }
 
 export function useDocuments() {
-  const [documents, setDocuments] = useState<DocumentFile[]>([]);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => { fetchJson("/api/documents").then(setDocuments).catch(() => {}).finally(() => setLoading(false)); }, []);
-  return { documents, loading };
+  const { snapshot, loading } = useOperations();
+  return { documents: snapshot.documents, loading };
 }
 
 export function useSiteReports() {
-  const [reports, setReports] = useState<SiteReport[]>([]);
-  const [loading, setLoading] = useState(true);
-  useEffect(() => { fetchJson("/api/reports").then(setReports).catch(() => {}).finally(() => setLoading(false)); }, []);
+  const { snapshot, loading, refresh } = useOperations();
   const createReport = useCallback(async (input: Omit<SiteReport, "id" | "createdAt">) => {
     const res = await fetch("/api/reports", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
     if (!res.ok) throw new Error("Failed to create report");
-    const created = await res.json();
-    setReports((prev) => [created, ...prev]);
-  }, []);
+    await refresh();
+  }, [refresh]);
   const updateReport = useCallback(async (id: string, input: Partial<SiteReport>) => {
     const res = await fetch(`/api/reports/${id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(input) });
     if (!res.ok) throw new Error("Failed to update report");
-    const updated = await res.json();
-    setReports((prev) => prev.map((r) => (r.id === id ? updated : r)));
-  }, []);
+    await refresh();
+  }, [refresh]);
   const deleteReport = useCallback(async (id: string) => {
     const res = await fetch(`/api/reports/${id}`, { method: "DELETE" });
     if (!res.ok) throw new Error("Failed to delete report");
-    setReports((prev) => prev.filter((r) => r.id !== id));
-  }, []);
-  return { reports, loading, createReport, updateReport, deleteReport };
+    await refresh();
+  }, [refresh]);
+  return { reports: snapshot.reports, loading, createReport, updateReport, deleteReport };
 }
 
 export function useAuditLogs() {

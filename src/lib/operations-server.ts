@@ -13,6 +13,8 @@ import type {
   TaskEvent,
   TaskState,
 } from "@/lib/operations-types";
+import type { SiteReport } from "@/lib/report-types";
+import type { DocumentFile } from "@/lib/document-types";
 
 type Row = Record<string, unknown>;
 
@@ -51,6 +53,8 @@ export async function getOperationsSnapshot(): Promise<OperationsSnapshot> {
     sb.from("alerts").select("*").order("created_at", { ascending: false }).limit(50),
     sb.from("processed_messages").select("*").order("created_at", { ascending: false }).limit(50),
     sb.from("task_commands").select("*").order("created_at", { ascending: false }).limit(50),
+    sb.from("site_reports").select("*").order("created_at", { ascending: false }).limit(100),
+    sb.from("documents").select("*").order("created_at", { ascending: false }).limit(50),
   ]);
   assertQueries(results);
 
@@ -127,6 +131,19 @@ export async function getOperationsSnapshot(): Promise<OperationsSnapshot> {
     result: row.result && typeof row.result === "object" ? row.result as Record<string, unknown> : null,
     error: typeof row.error === "string" ? row.error : null, createdAt: stringValue(row.created_at),
   }));
+  const reports: SiteReport[] = rows(results[8].data).map((row) => ({
+    id: stringValue(row.id), projectId: stringValue(row.project_id), title: stringValue(row.title),
+    type: stringValue(row.report_type, "update") as SiteReport["type"],
+    description: stringValue(row.description ?? ""), status: stringValue(row.status, "open") as SiteReport["status"],
+    createdBy: stringValue(row.created_by), createdAt: stringValue(row.created_at),
+    attachments: Array.isArray(row.attachments) ? row.attachments.map(String) : [],
+  }));
+  const documents: DocumentFile[] = rows(results[9].data).map((row) => ({
+    id: stringValue(row.id), name: stringValue(row.name),
+    type: stringValue(row.type, "pdf") as DocumentFile["type"],
+    projectId: stringValue(row.project_id), uploadedBy: stringValue(row.uploaded_by),
+    uploadedAt: stringValue(row.created_at), sizeKb: numberValue(row.size_kb),
+  }));
 
-  return { projects, tasks, subtasks, technicians, taskEvents, alerts, processedMessages, commands };
+  return { projects, tasks, subtasks, technicians, taskEvents, alerts, processedMessages, commands, reports, documents };
 }

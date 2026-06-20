@@ -1,3 +1,6 @@
+import type { SiteReport } from "@/lib/report-types";
+import type { DocumentFile } from "@/lib/document-types";
+
 export const taskStates = ["LOCKED", "READY", "ACTIVE", "BLOCKED", "REGRESSED", "COMPLETE", "FAILED"] as const;
 export type TaskState = (typeof taskStates)[number];
 
@@ -116,6 +119,8 @@ export type OperationsSnapshot = {
   alerts: OperationsAlert[];
   processedMessages: ProcessedMessage[];
   commands: TaskCommand[];
+  reports: SiteReport[];
+  documents: DocumentFile[];
 };
 
 export type OperationsCommandInput = {
