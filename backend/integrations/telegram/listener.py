@@ -1,3 +1,5 @@
+# Telethon event listener — handles voice, document, text, and photo messages.
+# Each type is processed differently and output as JSON to stdout.
 from datetime import datetime
 from pathlib import Path
 import json

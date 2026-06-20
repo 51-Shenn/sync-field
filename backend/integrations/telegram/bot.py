@@ -1,3 +1,7 @@
+# Telegram bot entry point
+#   - Connects as a bot user via Telethon
+#   - Fetches recent chat history (if admin)
+#   - Listens for incoming messages and processes them
 import asyncio
 
 from telethon import TelegramClient

@@ -1,3 +1,4 @@
+# Environment config — all secrets loaded from .env file
 import os
 from dotenv import load_dotenv
 

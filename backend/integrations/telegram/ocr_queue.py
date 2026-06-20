@@ -1,3 +1,5 @@
+# Async background queue that processes document OCR tasks in parallel
+# and prints JSON results to stdout (no files saved to disk)
 import asyncio
 import json
 from datetime import datetime
@@ -19,6 +21,7 @@ class OcrQueue:
         sent_at: datetime,
         chat_title: str | None = None,
     ) -> None:
+        # Spawn a background task; self-cleanup on completion via done callback
         task = asyncio.create_task(
             self._run(file_path, chat_id, message_id, sender_name, sent_at, chat_title)
         )
@@ -34,6 +37,7 @@ class OcrQueue:
         sent_at: datetime,
         chat_title: str | None = None,
     ) -> None:
+        # Execute OCR, print JSON to stdout, then delete the temp file
         path = Path(file_path)
         try:
             result = process_document(file_path, chat_id, message_id, sender_name, sent_at, chat_title)
