@@ -80,14 +80,13 @@ export function OperationsProvider({ children }: { children: React.ReactNode }) 
 
   const mutate = useCallback(async (url: string, method: string, body?: Record<string, unknown>) => {
     await requestJson(url, { method, body: body ? JSON.stringify(body) : undefined });
-    await refresh();
-  }, [refresh]);
+    // Realtime CDC will trigger refresh when the DB change propagates.
+  }, []);
 
   const value = useMemo<OperationsContextValue>(() => ({
     snapshot, loading, error, refresh,
     issueCommand: async (command) => {
       const result = await requestJson("/api/operations/commands", { method: "POST", body: JSON.stringify(command) }) as { commandId: string };
-      await refresh();
       return result.commandId;
     },
     createProject: (project) => mutate("/api/projects", "POST", project),

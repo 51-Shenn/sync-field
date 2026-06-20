@@ -1,9 +1,9 @@
 {
   "output": {
-    "filePath": "repomix-output-backend.xml",
+    "filePath": "repomix-output-all.xml",
     "style": "xml",
     "parsableStyle": true,
-    "headerText": "Imagine-Hack — Field Operations DAG Engine (Backend Only)",
+    "headerText": "SyncField — Field Operations DAG Engine + Next.js Frontend",
     "instructionFilePath": "AGENTS.md",
     "removeComments": false,
     "removeEmptyLines": false,
@@ -13,11 +13,23 @@
   "include": [
     "backend/**/*.py",
     "backend/**/*.sql",
-    "backend/**/*.json"
+    "backend/**/*.json",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.css",
+    "prisma/**/*.prisma",
+    "prisma.config.ts",
+    "next.config.ts",
+    "proxy.ts",
+    "tsconfig.json",
+    "package.json",
+    "AGENTS.md",
+    "STRATEGY.md"
   ],
   "ignore": {
     "useGitignore": true,
     "customPatterns": [
+      "repomix-output*.xml",
       "repomix-output*.xml",
       "package-lock.json",
       ".venv/",
@@ -27,7 +39,8 @@
       "downloads/",
       "node_modules/",
       ".next/",
-      "src/generated/prisma/"
+      "src/generated/prisma/",
+      ".claude/"
     ]
   }
 }
