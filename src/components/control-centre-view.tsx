@@ -26,8 +26,8 @@ export function ControlCentreView() {
   const openAlerts = snapshot.alerts.filter((alert) => alert.status === "pending");
   const today = new Intl.DateTimeFormat("en-US", { weekday: "long", month: "long", day: "numeric" }).format(new Date());
 
-  function createReport() {
-    pushReport(reportForm); setReportOpen(false); setReportForm(emptyReport());
+  async function createReport() {
+    try { await pushReport(reportForm); setReportOpen(false); setReportForm(emptyReport()); } catch { /* silently handled */ }
   }
 
   if (loading) return <Card className="p-16 text-center text-sm text-slate-500">Loading live operations…</Card>;

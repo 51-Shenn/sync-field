@@ -42,8 +42,9 @@ const emptyWorker = (): Omit<TeamMember, "id"> => ({
 });
 
 export function WorkforceView() {
-  const { projects } = useProjects();
-  const { teamMembers, createWorker, updateWorker, deleteWorker: removeWorker } = useTeamMembers();
+  const { projects, loading: projectsLoading } = useProjects();
+  const { teamMembers, loading: membersLoading, createWorker, updateWorker, deleteWorker: removeWorker } = useTeamMembers();
+  const loading = projectsLoading || membersLoading;
   const members = teamMembers;
   const [query, setQuery] = useState("");
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
@@ -56,7 +57,7 @@ export function WorkforceView() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
 
-  const roles = [...new Set(members.map((m) => m.role))];
+  const roles = [...new Set(teamMembers.map((m) => m.role))];
   const roleOptions = useMemo(
     () => roles.map((r) => ({ value: r, label: r })),
     [roles],
@@ -72,7 +73,7 @@ export function WorkforceView() {
 
   const filtered = useMemo(
     () =>
-      members.filter(
+      teamMembers.filter(
         (m) =>
           (selectedRoles.length === 0 || selectedRoles.includes(m.role)) &&
           (selectedProjects.length === 0 ||
@@ -80,7 +81,7 @@ export function WorkforceView() {
           (statusFilter === "all" || m.status === statusFilter) &&
           `${m.name} ${m.role}`.toLowerCase().includes(query.toLowerCase()),
       ),
-    [query, selectedRoles, selectedProjects, statusFilter, members],
+    [query, selectedRoles, selectedProjects, statusFilter, teamMembers],
   );
 
   const orgChartData = useMemo<OrgChartNode[]>(() => {
@@ -194,7 +195,7 @@ export function WorkforceView() {
   }
 
   function handleOrgNodeClick(node: OrgChartNode) {
-    const member = members.find((m) => m.id === node.id);
+    const member = teamMembers.find((m) => m.id === node.id);
     if (member) openEdit(member);
   }
 
@@ -203,6 +204,8 @@ export function WorkforceView() {
     { value: "active", label: "Active" },
     { value: "on_leave", label: "On leave" },
   ];
+
+  if (loading) return <Card className="p-16 text-center text-sm text-slate-500">Loading workforce data…</Card>;
 
   return (
     <>
