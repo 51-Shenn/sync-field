@@ -40,7 +40,7 @@ async function executeTaskCommand(sb: ReturnType<typeof getSupabaseAdmin>, comma
   if (command.commandType === "task.delete") {
     await deleteTaskWithReferences(command.taskId, {
       async clearTaskReference(table, taskId) {
-        const { error } = await sb.from(table).update({ task_id: null }).eq("task_id", taskId);
+        const { error } = await sb.from(table).delete().eq("task_id", taskId);
         if (error) throw new Error(error.message);
       },
       async deleteTask(taskId) {
