@@ -98,17 +98,20 @@ Unlike traditional project tracking systems, SyncField focuses on reducing resou
 7. Receive automated alerts and notifications.
 8. Take corrective actions to reduce resource wastage and improve efficiency.
 
-## Demo Materials
-
 ### System Screenshots
 
-### Architecture Diagram
+<img width="2159" height="1439" alt="Screenshot 2026-06-21 071747" src="https://github.com/user-attachments/assets/2e135d70-dea9-4a2a-aae4-a339c2b8144f" />
+<img width="2159" height="1439" alt="Screenshot 2026-06-21 071740" src="https://github.com/user-attachments/assets/b35aae45-98f6-4078-af55-1de4dc7e1e8e" />
+<img width="2159" height="1439" alt="Screenshot 2026-06-21 071727" src="https://github.com/user-attachments/assets/cc502f81-47cc-4d85-856d-fd76288dec18" />
+<img width="2159" height="1439" alt="Screenshot 2026-06-21 071721" src="https://github.com/user-attachments/assets/f91f759c-2fc0-49b1-ac72-090bd5166c53" />
 
 ### Demo Video
 
+[Watch in YouTube](https://youtu.be/LvadZlyKKOs)
+
 ### Presentation Slides
 
-Add links or embed screenshots/demo video here.
+[SyncField.pptx](https://github.com/user-attachments/files/29168607/SyncField.pptx)
 
 ## Expected Impact
 
