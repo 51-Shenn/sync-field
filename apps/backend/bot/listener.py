@@ -1,23 +1,16 @@
 from datetime import datetime
 from pathlib import Path
+import json
 
 from telethon import TelegramClient, events
+from telethon.tl.types import DocumentAttributeFilename
 from telethon.utils import get_display_name
 
+from bot.document_processor import detect_file_type, ocr_image_file
+from bot.ocr_queue import get_queue
 from bot.transcribe import preload_model, translate_audio
 
 DOWNLOAD_DIR = Path(__file__).resolve().parent.parent / "downloads"
-
-
-def format_text(event) -> str:
-    parts = []
-    if event.text:
-        parts.append(event.text)
-    if event.photo:
-        ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        fname = f"photo_{event.chat_id}_{ts}.jpg"
-        parts.append(f"[Photo → downloads/{fname}]")
-    return " | ".join(parts) if parts else "[non-text message]"
 
 
 async def setup_listener(client: TelegramClient) -> None:
@@ -28,29 +21,52 @@ async def setup_listener(client: TelegramClient) -> None:
     async def handler(event) -> None:
         sender = await event.get_sender()
         name = get_display_name(sender) if sender else "Unknown"
-        ts = datetime.now().strftime("%H:%M")
+        sent_at_iso = event.date.isoformat()
         chat_title = getattr(event.chat, "title", None) or "Private"
 
         if event.message.voice:
             ts_file = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
             tmp = DOWNLOAD_DIR / f"voice_{event.chat_id}_{ts_file}.ogg"
             await client.download_media(event.message, file=str(tmp))
-            print(f"[{ts}] [{chat_title}] {name}: [Voice → transcribing...]")
             try:
                 english_text = translate_audio(str(tmp))
-                print(f"[{ts}] [{chat_title}] {name} (English): {english_text}")
+                print(json.dumps({"sender_name": name, "sent_at": sent_at_iso, "chat_title": chat_title, "type": "voice", "text": english_text}, ensure_ascii=False))
             except Exception as e:
-                print(f"[{ts}] [{chat_title}] {name}: [Voice failed: {e}]")
+                print(json.dumps({"sender_name": name, "sent_at": sent_at_iso, "chat_title": chat_title, "type": "voice", "error": str(e)}, ensure_ascii=False))
             finally:
                 tmp.unlink(missing_ok=True)
             return
 
-        text = format_text(event)
-        print(f"[{ts}] [{chat_title}] {name}: {text}")
+        if event.message.document:
+            doc = event.message.document
+            filename = None
+            for attr in doc.attributes:
+                if isinstance(attr, DocumentAttributeFilename):
+                    filename = attr.file_name
+                    break
+            if filename and detect_file_type(filename):
+                ts_file = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+                tmp = DOWNLOAD_DIR / f"doc_{event.chat_id}_{ts_file}{Path(filename).suffix}"
+                await client.download_media(event.message, file=str(tmp))
+                get_queue().enqueue(str(tmp), event.chat_id, event.message.id,
+                                     name, event.date, chat_title)
+                return
+
+        if event.text:
+            print(json.dumps({"sender_name": name, "sent_at": sent_at_iso, "chat_title": chat_title, "type": "text", "text": event.text}, ensure_ascii=False))
 
         if event.photo:
-            ts = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            fname = f"photo_{event.chat_id}_{ts}.jpg"
-            await client.download_media(event.message, file=str(DOWNLOAD_DIR / fname))
+            ts_file = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            fname = f"photo_{event.chat_id}_{ts_file}.jpg"
+            photo_path = DOWNLOAD_DIR / fname
+            await client.download_media(event.message, file=str(photo_path))
+            try:
+                ocr_text = ocr_image_file(str(photo_path))
+                if ocr_text.strip():
+                    print(json.dumps({"sender_name": name, "sent_at": sent_at_iso, "chat_title": chat_title, "type": "photo", "text": ocr_text}, ensure_ascii=False))
+            except Exception as e:
+                print(json.dumps({"sender_name": name, "sent_at": sent_at_iso, "chat_title": chat_title, "type": "photo", "error": str(e)}, ensure_ascii=False))
+            finally:
+                photo_path.unlink(missing_ok=True)
 
     print("Listening for new messages...")
