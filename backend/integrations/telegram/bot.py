@@ -79,6 +79,9 @@ async def main() -> None:
     chat = await client.get_entity(int(config.TARGET_CHAT))
     print(f"Connected to: {chat.title if hasattr(chat, 'title') else chat.id}")
 
+    # Let the dispatcher's notifier reply role escalations back into this chat.
+    notifier.bind_telegram(client, chat, asyncio.get_running_loop())
+
     try:
         await fetch_history(client, chat, limit=50)
     except Exception as e:

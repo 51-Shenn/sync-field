@@ -112,8 +112,11 @@ class FieldOpsDispatcher:
             task_id, "ACTIVE", f"LLM: task start reported by {technician_id}"
         )
         self._sync(events)
-        self.engine.tasks[task_id]["assigned_to"] = technician_id
-        self.persist_tasks([task_id])
+        # assigned_to is a uuid FK to technicians; only assign a real technician.
+        # Dashboard actors (better-auth ids) and the "llm" fallback are not techs.
+        if technician_id in self.solver.technicians:
+            self.engine.tasks[task_id]["assigned_to"] = technician_id
+            self.persist_tasks([task_id])
         self.notifier.notify(
             technician_id,
             f"Task {task_id} started — marked ACTIVE."
