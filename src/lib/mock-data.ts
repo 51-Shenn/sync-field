@@ -10,7 +10,7 @@ export type Task = {
 };
 export type TeamMember = {
   id: string; name: string; role: string; email: string; phone: string; avatarUrl: string;
-  status: "active" | "on_leave"; projectIds: string[];
+  status: "active" | "on_leave"; projectIds: string[]; managerId?: string;
 };
 export type DocumentFile = {
   id: string; name: string; type: "pdf" | "image" | "doc" | "spreadsheet";
@@ -32,15 +32,15 @@ export type AuditLog = {
 
 export const teamMembers: TeamMember[] = [
   { id: "tm1", name: "Marcus Chen", role: "Project Director", email: "marcus@syncfield.co", phone: "(415) 555-0183", avatarUrl: "", status: "active", projectIds: ["riverside", "oakwood"] },
-  { id: "tm2", name: "Elena Rodriguez", role: "Site Manager", email: "elena@syncfield.co", phone: "(415) 555-0117", avatarUrl: "", status: "active", projectIds: ["riverside"] },
-  { id: "tm3", name: "James Wilson", role: "Civil Engineer", email: "james@syncfield.co", phone: "(510) 555-0199", avatarUrl: "", status: "active", projectIds: ["harbor", "metro"] },
-  { id: "tm4", name: "Priya Shah", role: "Architect", email: "priya@syncfield.co", phone: "(510) 555-0146", avatarUrl: "", status: "active", projectIds: ["oakwood", "crestline"] },
-  { id: "tm5", name: "Noah Williams", role: "Safety Officer", email: "noah@syncfield.co", phone: "(650) 555-0128", avatarUrl: "", status: "on_leave", projectIds: ["riverside", "harbor"] },
-  { id: "tm6", name: "Ava Thompson", role: "Cost Estimator", email: "ava@syncfield.co", phone: "(415) 555-0153", avatarUrl: "", status: "active", projectIds: ["riverside", "oakwood", "metro"] },
-  { id: "tm7", name: "Daniel Kim", role: "MEP Engineer", email: "daniel@syncfield.co", phone: "(650) 555-0172", avatarUrl: "", status: "active", projectIds: ["harbor", "crestline"] },
-  { id: "tm8", name: "Sofia Patel", role: "Foreperson", email: "sofia@syncfield.co", phone: "(510) 555-0134", avatarUrl: "", status: "active", projectIds: ["riverside", "summit"] },
-  { id: "tm9", name: "Liam O'Connor", role: "Electrician", email: "liam@syncfield.co", phone: "(415) 555-0168", avatarUrl: "", status: "active", projectIds: ["oakwood", "metro"] },
-  { id: "tm10", name: "Maya Brooks", role: "Document Controller", email: "maya@syncfield.co", phone: "(650) 555-0191", avatarUrl: "", status: "active", projectIds: ["riverside", "harbor", "oakwood"] },
+  { id: "tm2", name: "Elena Rodriguez", role: "Site Manager", email: "elena@syncfield.co", phone: "(415) 555-0117", avatarUrl: "", status: "active", projectIds: ["riverside"], managerId: "tm1" },
+  { id: "tm3", name: "James Wilson", role: "Civil Engineer", email: "james@syncfield.co", phone: "(510) 555-0199", avatarUrl: "", status: "active", projectIds: ["harbor", "metro"], managerId: "tm1" },
+  { id: "tm4", name: "Priya Shah", role: "Architect", email: "priya@syncfield.co", phone: "(510) 555-0146", avatarUrl: "", status: "active", projectIds: ["oakwood", "crestline"], managerId: "tm1" },
+  { id: "tm5", name: "Noah Williams", role: "Safety Officer", email: "noah@syncfield.co", phone: "(650) 555-0128", avatarUrl: "", status: "on_leave", projectIds: ["riverside", "harbor"], managerId: "tm2" },
+  { id: "tm6", name: "Ava Thompson", role: "Cost Estimator", email: "ava@syncfield.co", phone: "(415) 555-0153", avatarUrl: "", status: "active", projectIds: ["riverside", "oakwood", "metro"], managerId: "tm4" },
+  { id: "tm7", name: "Daniel Kim", role: "MEP Engineer", email: "daniel@syncfield.co", phone: "(650) 555-0172", avatarUrl: "", status: "active", projectIds: ["harbor", "crestline"], managerId: "tm3" },
+  { id: "tm8", name: "Sofia Patel", role: "Foreperson", email: "sofia@syncfield.co", phone: "(510) 555-0134", avatarUrl: "", status: "active", projectIds: ["riverside", "summit"], managerId: "tm2" },
+  { id: "tm9", name: "Liam O'Connor", role: "Electrician", email: "liam@syncfield.co", phone: "(415) 555-0168", avatarUrl: "", status: "active", projectIds: ["oakwood", "metro"], managerId: "tm8" },
+  { id: "tm10", name: "Maya Brooks", role: "Document Controller", email: "maya@syncfield.co", phone: "(650) 555-0191", avatarUrl: "", status: "active", projectIds: ["riverside", "harbor", "oakwood"], managerId: "tm4" },
 ];
 
 export const projects: Project[] = [

@@ -1,19 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { GitBranch, HardHat, Mail, Phone, Plus, Search, Shield, Trash2, Pencil, Users, Wrench } from "lucide-react";
+import { Mail, Phone, Plus, Search, Trash2, Pencil } from "lucide-react";
 import { projects, teamMembers as mockMembers, type TeamMember, auditLogs as initialLogs, type AuditLog } from "@/lib/mock-data";
 import { Avatar, Badge, Button, Card, CardContent, Dialog, Input, Label, Select } from "@/components/ui";
+import { OrgChart, type OrgChartNode } from "@/components/org-chart";
 
 const emptyWorker = (): Omit<TeamMember, "id"> => ({ name: "", role: "", email: "", phone: "", avatarUrl: "", status: "active", projectIds: [] });
-
-const roleHierarchy = ["Project Director", "Site Manager", "Civil Engineer", "Architect", "MEP Engineer", "Safety Officer", "Cost Estimator", "Document Controller", "Foreperson", "Electrician"];
-
-const roleIcons: Record<string, typeof Users> = {
-  "Project Director": Users, "Site Manager": Shield, "Foreperson": HardHat, "Electrician": Wrench,
-};
-
-const statusColors: Record<string, string> = { active: "bg-emerald-500", on_leave: "bg-amber-500" };
 
 export function WorkforceView() {
   const [members, setMembers] = useState(mockMembers);
@@ -24,23 +17,29 @@ export function WorkforceView() {
   const [editing, setEditing] = useState(false);
   const [viewMode, setViewMode] = useState<"cards" | "orgchart">("cards");
   const [logs, setLogs] = useState(initialLogs);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const roles = [...new Set(members.map(m => m.role))];
   const filtered = useMemo(() => members.filter(m => (role === "all" || m.role === role) && `${m.name} ${m.role}`.toLowerCase().includes(query.toLowerCase())), [query, role, members]);
 
-  const orgTree = useMemo(() => {
-    const byRole: Record<string, TeamMember[]> = {};
-    const roleOrder = roleHierarchy.filter(r => members.some(m => m.role === r));
-    roleOrder.forEach(r => { byRole[r] = members.filter(m => m.role === r); });
-    return { roleOrder, byRole };
-  }, [members]);
+  const orgChartData = useMemo<OrgChartNode[]>(() => members.map(m => ({
+    id: m.id,
+    parentId: m.managerId ?? null,
+    name: m.name,
+    role: m.role,
+    email: m.email,
+    phone: m.phone,
+    status: m.status,
+    avatarUrl: m.avatarUrl,
+    projectIds: m.projectIds,
+  })), [members]);
 
   function log(action: AuditLog["action"], entity: string, entityId: string, entityName: string, details: string) {
     const entry: AuditLog = { id: `al${Date.now()}`, action, entity, entityId, entityName, performedBy: "Marcus Chen", timestamp: new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }), details };
     setLogs(prev => [entry, ...prev]);
   }
 
-  function resetForm() { setForm(emptyWorker()); setEditMember(null); setEditing(false); }
-  function openEdit(member: TeamMember) { setEditMember(member); setForm({ name: member.name, role: member.role, email: member.email, phone: member.phone, avatarUrl: member.avatarUrl, status: member.status, projectIds: [...member.projectIds] }); setEditing(true); }
+  function resetForm() { setForm(emptyWorker()); setEditMember(null); setEditing(false); setDialogOpen(false); }
+  function openEdit(member: TeamMember) { setEditMember(member); setForm({ name: member.name, role: member.role, email: member.email, phone: member.phone, avatarUrl: member.avatarUrl, status: member.status, projectIds: [...member.projectIds] }); setEditing(true); setDialogOpen(true); }
   function saveWorker() {
     if (editing && editMember) {
       setMembers(prev => prev.map(m => m.id === editMember.id ? { ...m, ...form } : m));
@@ -58,42 +57,10 @@ export function WorkforceView() {
     if (editMember?.id === id) resetForm();
   }
 
-  const orgChartView = <div className="space-y-10 py-4">
-    {orgTree.roleOrder.map((roleName, ri) => {
-      const people = orgTree.byRole[roleName];
-      const IconComp = roleIcons[roleName] || GitBranch;
-      return <div key={roleName}>
-        <div className="mb-4 flex items-center gap-2">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-orange-50 text-orange-600"><IconComp className="size-4" /></div>
-          <h3 className="font-semibold text-slate-800">{roleName}</h3>
-          <span className="text-xs text-slate-400">({people.length})</span>
-        </div>
-        {ri > 0 && <div className="mb-4 ml-1 flex items-center gap-2 text-[10px] text-slate-400"><svg className="size-3 text-slate-300" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>reports to {orgTree.roleOrder[ri - 1]}</div>}
-        <div className="relative">
-          {ri > 0 && <div className="absolute -top-4 left-[19px] h-4 w-px bg-slate-200" />}
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {people.map(person => {
-              const projectNames = person.projectIds.map(id => projects.find(p => p.id === id)?.name.split(" ")[0]).filter(Boolean).join(", ");
-              return <div key={person.id} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm transition-shadow hover:shadow-md">
-                <div className="relative">
-                  <Avatar name={person.name} size="md" />
-                  <span className={`absolute -bottom-0.5 -right-0.5 size-2.5 rounded-full border-2 border-white ${statusColors[person.status] || "bg-slate-300"}`} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-slate-900">{person.name}</p>
-                  <p className="truncate text-xs text-slate-500">{person.email}</p>
-                  <div className="mt-1 flex items-center gap-2">
-                    <span className="text-[10px] font-medium capitalize text-slate-400">{person.status.replace("_", " ")}</span>
-                    {projectNames && <span className="truncate text-[10px] text-slate-400">&middot; {projectNames}</span>}
-                  </div>
-                </div>
-              </div>;
-            })}
-          </div>
-        </div>
-      </div>;
-    })}
-  </div>;
+  function handleOrgNodeClick(node: OrgChartNode) {
+    const member = members.find(m => m.id === node.id);
+    if (member) openEdit(member);
+  }
 
   return <>
     <div className="mb-5 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row">
@@ -108,16 +75,16 @@ export function WorkforceView() {
       </Dialog>
     </div>
 
-    {viewMode === "orgchart" ? orgChartView : (
+    {viewMode === "orgchart" ? (
+      <OrgChart data={orgChartData} onNodeClick={handleOrgNodeClick} searchQuery={query} />
+    ) : (
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {filtered.map(member => <Card key={member.id} className="transition-shadow hover:shadow-md">
           <CardContent>
             <div className="flex items-start justify-between">
               <Avatar name={member.name} size="xl" />
               <div className="flex gap-1">
-                <Dialog trigger={<Button variant="ghost" size="icon" className="size-8"><Pencil className="size-3.5" /></Button>} title="Edit worker profile" description="Update worker details.">
-                  <WorkerForm form={form} setForm={setForm} onSave={saveWorker} onCancel={resetForm} editing={true} />
-                </Dialog>
+                <Button variant="ghost" size="icon" className="size-8" onClick={() => openEdit(member)}><Pencil className="size-3.5" /></Button>
                 <Button variant="ghost" size="icon" className="size-8 text-red-500 hover:bg-red-50 hover:text-red-700" onClick={() => deleteWorker(member.id)}><Trash2 className="size-3.5" /></Button>
               </div>
             </div>
@@ -134,6 +101,10 @@ export function WorkforceView() {
       </div>
     )}
     {viewMode === "cards" && filtered.length === 0 && <div className="rounded-xl border border-dashed border-slate-300 bg-white py-20 text-center"><p className="font-medium text-slate-800">No workers found</p><p className="mt-1 text-sm text-slate-500">Try a different search or add a new worker.</p></div>}
+
+    <Dialog open={dialogOpen} onOpenChange={o => { setDialogOpen(o); if (!o) resetForm(); }} title="Edit worker profile" description="Update worker details.">
+      <WorkerForm form={form} setForm={setForm} onSave={saveWorker} onCancel={resetForm} editing={true} />
+    </Dialog>
   </>;
 }
 
