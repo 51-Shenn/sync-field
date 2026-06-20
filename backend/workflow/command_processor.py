@@ -8,6 +8,7 @@ from backend.workflow.template_guesser import TemplateGuesser
 
 
 DATETIME_FIELDS = ("blocked_since", "scheduled_start", "deadline", "earliest_start")
+TASK_REFERENCE_TABLES = ("task_events", "processed_messages", "alerts")
 
 
 def hydrate_task_rows(rows: list[dict]) -> list[dict]:
@@ -161,6 +162,8 @@ class CommandProcessor:
         if command_type == "task.delete":
             if not task_id:
                 raise ValueError("taskId is required")
+            for table in TASK_REFERENCE_TABLES:
+                self.sb.table(table).update({"task_id": None}).eq("task_id", task_id).execute()
             self.sb.table("tasks").delete().eq("id", task_id).execute()
             self.reload_graph()
             return {"taskId": task_id, "deleted": True}

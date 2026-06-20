@@ -18,7 +18,7 @@ export async function POST(request: Request) {
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const body = await request.json();
-    const report = await createSiteReport({ ...body, createdBy: session.user.id, creatorName: session.user.name ?? "" });
+    const report = await createSiteReport({ ...body, createdBy: session.user.id });
     return NextResponse.json(report, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: (error as Error).message }, { status: 500 });

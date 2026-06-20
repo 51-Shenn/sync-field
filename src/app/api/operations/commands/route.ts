@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getRequiredSession } from "@/lib/api-auth";
 import { getSupabaseAdmin } from "@/lib/supabase-server";
 import { legalTaskTransitions, taskStates, type OperationsCommandInput, type TaskState } from "@/lib/operations-types";
-import { buildTaskCreateRow, buildTaskTransitionUpdate, buildTaskUpdate } from "@/lib/task-command-mutations";
+import { buildTaskCreateRow, buildTaskTransitionUpdate, buildTaskUpdate, deleteTaskWithReferences } from "@/lib/task-command-mutations";
 
 const allowedCommands = new Set<OperationsCommandInput["commandType"]>([
   "task.create", "task.update", "task.delete", "task.transition", "task.assign",
@@ -38,8 +38,16 @@ async function executeTaskCommand(sb: ReturnType<typeof getSupabaseAdmin>, comma
   }
 
   if (command.commandType === "task.delete") {
-    const { error } = await sb.from("tasks").delete().eq("id", command.taskId);
-    if (error) throw new Error(error.message);
+    await deleteTaskWithReferences(command.taskId, {
+      async clearTaskReference(table, taskId) {
+        const { error } = await sb.from(table).delete().eq("task_id", taskId);
+        if (error) throw new Error(error.message);
+      },
+      async deleteTask(taskId) {
+        const { error } = await sb.from("tasks").delete().eq("id", taskId);
+        if (error) throw new Error(error.message);
+      },
+    });
     return { taskId: command.taskId, deleted: true };
   }
 

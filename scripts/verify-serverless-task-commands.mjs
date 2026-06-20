@@ -3,6 +3,7 @@ import {
   buildTaskCreateRow,
   buildTaskTransitionUpdate,
   buildTaskUpdate,
+  deleteTaskWithReferences,
 } from "../src/lib/task-command-mutations.ts";
 
 const now = "2026-06-21T00:00:00.000Z";
@@ -47,5 +48,24 @@ assert.deepEqual(buildTaskUpdate({ title: "Updated", estimatedDurationHours: 4 }
   estimated_duration_hours: 4,
   updated_at: now,
 });
+
+const references = new Map([
+  ["task_events", new Set(["T_TEST"])],
+  ["processed_messages", new Set(["T_TEST"])],
+  ["alerts", new Set(["T_TEST"])],
+]);
+let taskDeleted = false;
+await deleteTaskWithReferences("T_TEST", {
+  async clearTaskReference(table, taskId) {
+    references.get(table).delete(taskId);
+  },
+  async deleteTask(taskId) {
+    const blockingTable = [...references].find(([, taskIds]) => taskIds.has(taskId))?.[0];
+    if (blockingTable) throw new Error(`${blockingTable}_task_id_fkey`);
+    taskDeleted = true;
+  },
+});
+assert.equal(taskDeleted, true);
+assert.deepEqual([...references.values()].map((taskIds) => taskIds.size), [0, 0, 0]);
 
 console.log("verified serverless Kanban task command mutations");

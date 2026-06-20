@@ -21,7 +21,7 @@ create table if not exists site_reports (
   id text primary key,
   project_id text,
   title text not null,
-  type text not null default 'update',
+  report_type text not null default 'update',
   description text,
   status text not null default 'open',
   created_by text,
@@ -115,7 +115,7 @@ insert into documents (id, name, type, project_id, uploaded_by, uploaded_at, siz
 on conflict (id) do nothing;
 
 -- Site reports
-insert into site_reports (id, project_id, title, type, description, status, created_by, created_at, attachments) values
+insert into site_reports (id, project_id, title, report_type, description, status, created_by, created_at, attachments) values
   ('sr1', 'riverside', 'Level 14 rebar issue', 'issue', 'Some rebar splices are out of tolerance as per ACI 318.', 'open', 'tm2', 'Jun 19, 2026', '{rebar_photo_01.jpg}'),
   ('sr2', 'riverside', 'Weekly progress update', 'update', 'Concrete pour complete. Plumbing rough-in on schedule.', 'resolved', 'tm8', 'Jun 18, 2026', '{progress_report_w24.pdf}'),
   ('sr3', 'oakwood', 'Building C foundation pour', 'update', 'Foundation pour completed successfully.', 'resolved', 'tm1', 'Jun 17, 2026', '{cylinder_break_report.pdf}'),

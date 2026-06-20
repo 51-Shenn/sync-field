@@ -2,6 +2,13 @@ import type { TaskState } from "@/lib/operations-types";
 
 type TaskCommandPayload = Record<string, unknown> | undefined;
 
+export const taskReferenceTables = ["task_events", "processed_messages", "alerts"] as const;
+
+type TaskDeletionStore = {
+  clearTaskReference: (table: (typeof taskReferenceTables)[number], taskId: string) => Promise<void>;
+  deleteTask: (taskId: string) => Promise<void>;
+};
+
 type TaskCreateCommand = {
   projectId?: string;
   payload?: Record<string, unknown>;
@@ -56,4 +63,11 @@ export function buildTaskTransitionUpdate(currentState: TaskState, targetState: 
     fields.failure_category = null;
   }
   return fields;
+}
+
+export async function deleteTaskWithReferences(taskId: string, store: TaskDeletionStore) {
+  for (const table of taskReferenceTables) {
+    await store.clearTaskReference(table, taskId);
+  }
+  await store.deleteTask(taskId);
 }
