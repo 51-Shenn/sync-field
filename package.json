@@ -4,9 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
     "start": "next start",
-    "postinstall": "prisma generate",
     "lint": "eslint",
     "verify:operations": "node scripts/verify-operations.mjs",
     "run-sql-file": "dotenv -e .env -- npx supabase db query --linked --file",
