@@ -39,9 +39,9 @@ const emptyWorker = (): Omit<TeamMember, "id"> => ({
 });
 
 export function WorkforceView() {
-  const { projects } = useProjects();
-  const { teamMembers } = useTeamMembers();
-  const [members] = useState(teamMembers);
+  const { projects, loading: projectsLoading } = useProjects();
+  const { teamMembers, loading: membersLoading } = useTeamMembers();
+  const loading = projectsLoading || membersLoading;
   const [query, setQuery] = useState("");
   const [selectedRoles, setSelectedRoles] = useState<string[]>([]);
   const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
@@ -52,7 +52,7 @@ export function WorkforceView() {
   const [viewMode, setViewMode] = useState<"cards" | "orgchart">("cards");
   const [dialogOpen, setDialogOpen] = useState(false);
 
-  const roles = [...new Set(members.map((m) => m.role))];
+  const roles = [...new Set(teamMembers.map((m) => m.role))];
   const roleOptions = useMemo(
     () => roles.map((r) => ({ value: r, label: r })),
     [roles],
@@ -64,7 +64,7 @@ export function WorkforceView() {
 
   const filtered = useMemo(
     () =>
-      members.filter(
+      teamMembers.filter(
         (m) =>
           (selectedRoles.length === 0 || selectedRoles.includes(m.role)) &&
           (selectedProjects.length === 0 ||
@@ -72,12 +72,12 @@ export function WorkforceView() {
           (statusFilter === "all" || m.status === statusFilter) &&
           `${m.name} ${m.role}`.toLowerCase().includes(query.toLowerCase()),
       ),
-    [query, selectedRoles, selectedProjects, statusFilter, members],
+    [query, selectedRoles, selectedProjects, statusFilter, teamMembers],
   );
 
   const orgChartData = useMemo<OrgChartNode[]>(() => {
     const matchingIds = new Set(
-      members
+      teamMembers
         .filter(
           (m) =>
             (selectedRoles.length === 0 || selectedRoles.includes(m.role)) &&
@@ -89,27 +89,49 @@ export function WorkforceView() {
         .map((m) => m.id),
     );
 
+    const toNode = (m: TeamMember) => ({
+      id: m.id,
+      parentId: m.managerId ?? null,
+      name: m.name,
+      role: m.role,
+      email: m.email,
+      phone: m.phone,
+      status: m.status,
+      avatarUrl: m.avatarUrl,
+      projectIds: m.projectIds,
+    });
+
+    const build = (items: TeamMember[]) => {
+      const nodes = items.map(toNode);
+      const roots = nodes.filter((n) => n.parentId === null);
+      if (roots.length <= 1) return nodes;
+      const rootId = "__org_root__";
+      nodes.push({
+        id: rootId,
+        parentId: null,
+        name: "Organization",
+        role: "",
+        email: "",
+        phone: "",
+        status: "active",
+        avatarUrl: "",
+        projectIds: [],
+      });
+      roots.forEach((r) => (r.parentId = rootId));
+      return nodes;
+    };
+
     if (
       selectedRoles.length === 0 &&
       selectedProjects.length === 0 &&
       statusFilter === "all" &&
       !query
     ) {
-      return members.map((m) => ({
-        id: m.id,
-        parentId: m.managerId ?? null,
-        name: m.name,
-        role: m.role,
-        email: m.email,
-        phone: m.phone,
-        status: m.status,
-        avatarUrl: m.avatarUrl,
-        projectIds: m.projectIds,
-      }));
+      return build(teamMembers);
     }
 
     const includeIds = new Set(matchingIds);
-    const memberMap = new Map(members.map((m) => [m.id, m]));
+    const memberMap = new Map(teamMembers.map((m) => [m.id, m]));
     matchingIds.forEach((id) => {
       let current = memberMap.get(id);
       while (current?.managerId) {
@@ -118,20 +140,8 @@ export function WorkforceView() {
       }
     });
 
-    return members
-      .filter((m) => includeIds.has(m.id))
-      .map((m) => ({
-        id: m.id,
-        parentId: m.managerId ?? null,
-        name: m.name,
-        role: m.role,
-        email: m.email,
-        phone: m.phone,
-        status: m.status,
-        avatarUrl: m.avatarUrl,
-        projectIds: m.projectIds,
-      }));
-  }, [members, query, selectedRoles, selectedProjects, statusFilter]);
+    return build(teamMembers.filter((m) => includeIds.has(m.id)));
+  }, [teamMembers, query, selectedRoles, selectedProjects, statusFilter]);
 
   function resetForm() {
     setForm(emptyWorker());
@@ -161,7 +171,7 @@ export function WorkforceView() {
   }
 
   function handleOrgNodeClick(node: OrgChartNode) {
-    const member = members.find((m) => m.id === node.id);
+    const member = teamMembers.find((m) => m.id === node.id);
     if (member) openEdit(member);
   }
 
@@ -170,6 +180,8 @@ export function WorkforceView() {
     { value: "active", label: "Active" },
     { value: "on_leave", label: "On leave" },
   ];
+
+  if (loading) return <Card className="p-16 text-center text-sm text-slate-500">Loading workforce data…</Card>;
 
   return (
     <>
