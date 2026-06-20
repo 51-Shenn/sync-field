@@ -2,29 +2,32 @@
 
 import { useMemo, useState } from "react";
 import { IconPhoto, IconFileDescription, IconPaperclip, IconPlus, IconSearch, IconTrash } from "@tabler/icons-react";
-import { projects, siteReports as mockReports, teamMembers, type SiteReport, auditLogs as initialLogs, type AuditLog } from "@/lib/mock-data";
+import { projects, teamMembers, type SiteReport, auditLogs as initialLogs, type AuditLog } from "@/lib/mock-data";
 import { Avatar, Badge, Button, Card, CardContent, Dialog, Input, Label, Select, Textarea } from "@/components/ui";
+import { useStoredReports } from "@/lib/use-stored-reports";
 
 const emptyReport = (): Omit<SiteReport, "id" | "createdAt"> => ({ projectId: "", title: "", type: "update", description: "", status: "open", createdBy: "", attachments: [] });
+const eventId = (prefix: string) => `${prefix}${Date.now()}`;
+const eventDate = () => new Date();
 
 export function SitesView() {
-  const [reports, setReports] = useState(mockReports);
+  const [reports, setReports] = useStoredReports();
   const [query, setQuery] = useState("");
   const [projectId, setProjectId] = useState("all");
   const [form, setForm] = useState(emptyReport());
   const [attachInput, setAttachInput] = useState("");
-  const [logs, setLogs] = useState(initialLogs);
+  const [, setLogs] = useState(initialLogs);
 
   const filtered = useMemo(() => reports.filter(r => (projectId === "all" || r.projectId === projectId) && r.title.toLowerCase().includes(query.toLowerCase())), [query, projectId, reports]);
 
   function log(action: AuditLog["action"], entity: string, entityId: string, entityName: string, details: string) {
-    const entry: AuditLog = { id: `al${Date.now()}`, action, entity, entityId, entityName, performedBy: "Marcus Chen", timestamp: new Date().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }), details };
+    const entry: AuditLog = { id: eventId("al"), action, entity, entityId, entityName, performedBy: "Marcus Chen", timestamp: eventDate().toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }), details };
     setLogs(prev => [entry, ...prev]);
   }
 
   function resetForm() { setForm(emptyReport()); setAttachInput(""); }
   function addReport() {
-    const newReport: SiteReport = { id: `sr${Date.now()}`, createdAt: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), ...form };
+    const newReport: SiteReport = { id: eventId("sr"), createdAt: eventDate().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }), ...form };
     setReports(prev => [newReport, ...prev]);
     log("created", "report", newReport.id, form.title, `${form.type === "update" ? "Site update" : "Issue"} report created.`);
     resetForm();
